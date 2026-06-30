@@ -4,3 +4,4 @@ anthropic==0.40.0
 schedule==1.2.2
 tenacity==9.0.0
 pyyaml==6.0.2
+pandas>=2.0.0   # jobspy returns DataFrames; also used for NaN checks in normalization

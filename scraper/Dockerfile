@@ -38,6 +38,5 @@ COPY . .
 # Create directories that will be mounted as volumes
 RUN mkdir -p /app/db /app/logs /app/config
 
-# Initialize the database (safe to run multiple times — uses IF NOT EXISTS),
-# then start the scheduler.
-CMD ["sh", "-c", "python /app/db/init_db.py && python scheduler.py"]
+# scheduler.py calls init_db() itself before the first scrape.
+CMD ["python", "scheduler.py"]
