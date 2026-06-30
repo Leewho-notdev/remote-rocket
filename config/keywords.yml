@@ -1,0 +1,50 @@
+# ============================================================
+# Remote Rocket — Keyword Configuration
+# Edit this file to tune what jobs are fetched from job boards.
+# No code changes needed — changes take effect on next scrape.
+# ============================================================
+
+# Search terms sent to job boards via JobSpy.
+# Each term is searched across LinkedIn, Indeed, Glassdoor, and ZipRecruiter.
+# Tip: be specific. Broad terms waste API budget on irrelevant results.
+search_terms:
+  - "remote performance marketing manager"
+  - "remote paid search manager"
+  - "remote SEM manager"
+  - "remote Google Ads manager"
+  - "remote Google Ads specialist"
+  - "remote paid media manager"
+  - "remote paid media specialist"
+  - "remote PPC manager"
+  - "remote PPC specialist"
+  - "remote biddable media manager"
+  - "remote growth marketing paid search"
+  - "remote digital marketing manager paid search"
+  - "remote search engine marketing"
+
+# Keywords that signal a strong match when found in a job title.
+# Used by the LLM to boost relevance scores.
+title_boost_keywords:
+  - "paid search"
+  - "SEM"
+  - "PPC"
+  - "performance marketing"
+  - "biddable media"
+  - "search advertising"
+  - "paid media"
+
+# Jobs with these phrases in the title are excluded BEFORE the LLM runs.
+# This saves Claude API cost on obvious non-matches.
+title_exclusions:
+  - "social media manager"
+  - "social media specialist"
+  - "content marketing"
+  - "content strategist"
+  - "SEO specialist"
+  - "SEO manager"
+  - "email marketing"
+  - "email specialist"
+  - "community manager"
+  - "influencer marketing"
+  - "copywriter"
+  - "graphic designer"

@@ -1,0 +1,6 @@
+python-jobspy==1.1.80
+crawl4ai==0.4.247
+anthropic==0.40.0
+schedule==1.2.2
+tenacity==9.0.0
+pyyaml==6.0.2

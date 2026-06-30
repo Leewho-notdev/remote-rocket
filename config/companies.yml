@@ -1,0 +1,77 @@
+# ============================================================
+# Remote Rocket — Target Company Career Pages
+# ============================================================
+# Add companies here to scrape their career pages directly.
+# These "hidden gem" jobs often appear here before job boards.
+#
+# Fields:
+#   name          (required) Company display name
+#   careers_url   (required) Direct URL to the jobs/careers listing page
+#   high_priority (optional) true = scraped every run
+#                            false/omitted = scraped every other run
+#   notes         (optional) Reminder about the company or page quirks
+# ============================================================
+
+companies:
+
+  # --- Agencies (highest volume of relevant remote PPC roles) ---
+
+  - name: "Tinuiti"
+    careers_url: "https://tinuiti.com/careers/"
+    high_priority: true
+    notes: "Large performance agency. Strong remote culture."
+
+  - name: "Wpromote"
+    careers_url: "https://www.wpromote.com/careers"
+    high_priority: true
+    notes: "Performance-focused agency. Frequently hires remote paid search."
+
+  - name: "Logical Position"
+    careers_url: "https://www.logicalposition.com/careers"
+    high_priority: true
+
+  - name: "PMG"
+    careers_url: "https://www.pmg.com/careers/"
+    high_priority: true
+    notes: "Data-driven performance agency."
+
+  - name: "Jellyfish"
+    careers_url: "https://www.jellyfish.com/en-us/careers"
+    high_priority: true
+
+  - name: "Directive Consulting"
+    careers_url: "https://directiveconsulting.com/careers/"
+    high_priority: false
+    notes: "B2B performance marketing agency."
+
+  - name: "NP Digital"
+    careers_url: "https://npdigital.com/careers/"
+    high_priority: false
+
+  - name: "Seer Interactive"
+    careers_url: "https://www.seerinteractive.com/careers"
+    high_priority: false
+
+  # --- SaaS / Tech (strong in-house marketing teams) ---
+
+  - name: "HubSpot"
+    careers_url: "https://www.hubspot.com/careers/jobs"
+    high_priority: false
+
+  - name: "Klaviyo"
+    careers_url: "https://www.klaviyo.com/careers"
+    high_priority: false
+
+  - name: "Semrush"
+    careers_url: "https://www.semrush.com/careers/"
+    high_priority: false
+
+  - name: "Bazaarvoice"
+    careers_url: "https://www.bazaarvoice.com/careers/"
+    high_priority: false
+
+  - name: "ClickUp"
+    careers_url: "https://clickup.com/careers"
+    high_priority: false
+
+  # Add more companies below. No code changes needed.

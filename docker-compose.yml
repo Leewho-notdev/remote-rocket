@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  scraper:
+    build: ./scraper
+    container_name: remote-rocket-scraper
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./db:/app/db          # SQLite database persisted here
+      - ./logs:/app/logs      # Log files persisted here
+      - ./config:/app/config  # YAML config files (edit without rebuilding)
+
+  app:
+    build: ./app
+    container_name: remote-rocket-app
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8501:8501"           # Access the UI at http://your-server-ip:8501
+    volumes:
+      - ./db:/app/db          # Reads the same database as the scraper
+      - ./config:/app/config  # Can read config for the Settings page
+    depends_on:
+      - scraper
+
+  # Optional: uncomment when you have a domain + SSL cert
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: remote-rocket-nginx
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - ./nginx/certs:/etc/nginx/certs:ro
+  #   depends_on:
+  #     - app
