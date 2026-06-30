@@ -13,7 +13,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import streamlit as st
-from components.db import get_jobs, get_job_counts
+from components.db import get_jobs, get_job_counts, db_exists
 from components.filters import render_filters
 from components.job_card import render_job_card
 
@@ -25,6 +25,15 @@ st.set_page_config(
 
 # ── Sidebar filters ───────────────────────────────────────────────────────────
 filters = render_filters()
+
+if not db_exists():
+    st.title("📋 Browse Jobs")
+    st.info(
+        "The scraper is initializing. Jobs will appear here after the first scrape completes "
+        "(usually 5–15 minutes). Check **Settings** for live status.",
+        icon="⏳",
+    )
+    st.stop()
 
 # ── Page header ───────────────────────────────────────────────────────────────
 st.title("📋 Browse Jobs")

@@ -15,7 +15,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from components.db import get_job_counts, get_last_successful_run
+from components.db import get_job_counts, get_last_successful_run, db_exists
 
 st.set_page_config(
     page_title="Remote Rocket",
@@ -31,6 +31,15 @@ st.caption("Your personal feed for remote performance marketing jobs.")
 st.divider()
 
 # ── Quick stats ───────────────────────────────────────────────────────────────
+if not db_exists():
+    st.info(
+        "The scraper is starting up for the first time. "
+        "Jobs will appear here automatically once the first scrape finishes (usually 5–15 minutes). "
+        "Check the **Settings** page for scrape status.",
+        icon="⏳",
+    )
+    st.stop()
+
 counts      = get_job_counts()
 last_run    = get_last_successful_run()
 

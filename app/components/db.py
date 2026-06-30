@@ -12,6 +12,11 @@ import os
 DB_PATH = os.getenv("DB_PATH", "/app/db/jobs.db")
 
 
+def db_exists() -> bool:
+    """Return True if the database file exists and has been initialized."""
+    return os.path.exists(DB_PATH) and os.path.getsize(DB_PATH) > 0
+
+
 def get_connection() -> sqlite3.Connection:
     """Return a read/write connection with dict-like row access."""
     conn = sqlite3.connect(DB_PATH)
@@ -258,6 +263,29 @@ def get_recent_scrape_runs(limit: int = 10) -> list:
                     d["error_details"] = []
             results.append(d)
         return results
+    finally:
+        conn.close()
+
+
+def get_application_by_id(app_id: int) -> dict | None:
+    """Fetch a single application row joined with its job."""
+    conn = get_connection()
+    try:
+        row = conn.execute("""
+            SELECT
+                a.*,
+                j.title, j.company, j.url,
+                j.salary_min, j.salary_max, j.salary_raw,
+                j.employment_type, j.relevance_score,
+                j.has_google_ads, j.has_msft_ads, j.has_gtm, j.has_gmc,
+                j.is_hidden_gem, j.source, j.date_posted, j.date_scraped,
+                j.description_clean, j.description_raw,
+                j.skills_detected, j.requirements
+            FROM applications a
+            JOIN jobs j ON j.id = a.job_id
+            WHERE a.id = ?
+        """, (app_id,)).fetchone()
+        return _row_to_dict(row) if row else None
     finally:
         conn.close()
 
