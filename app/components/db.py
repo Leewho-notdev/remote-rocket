@@ -278,6 +278,27 @@ def get_last_successful_run() -> dict:
 
 
 # ============================================================
+# MANUAL SCRAPE TRIGGER
+# ============================================================
+
+TRIGGER_FILE = os.getenv("TRIGGER_FILE", "/app/db/.scrape_trigger")
+
+
+def trigger_scrape() -> bool:
+    """
+    Write the trigger file to the shared volume so the scraper container picks
+    it up within ~60 seconds and starts a scrape immediately.
+    Returns True on success, False if the file could not be written.
+    """
+    try:
+        with open(TRIGGER_FILE, "w") as f:
+            f.write("trigger")
+        return True
+    except OSError:
+        return False
+
+
+# ============================================================
 # INTERNAL HELPERS
 # ============================================================
 

@@ -132,11 +132,20 @@ CREATE TABLE IF NOT EXISTS scrape_runs (
     jobs_new       INTEGER DEFAULT 0,  -- New jobs added to the database
     jobs_updated   INTEGER DEFAULT 0,  -- Existing jobs refreshed (last_seen_at updated)
     jobs_excluded  INTEGER DEFAULT 0,  -- Jobs filtered out by LLM exclusion rules
+    jobs_scored    INTEGER DEFAULT 0,  -- Jobs that went through LLM extraction this run
 
     -- Error tracking
     errors         INTEGER DEFAULT 0,  -- Count of individual errors during the run
     error_details  TEXT                -- JSON array of error message strings
 );
+
+-- Migration: add jobs_scored to existing databases that pre-date this column.
+-- SQLite ignores this if the column already exists via the IF NOT EXISTS trick
+-- (we use a no-op: the ADD COLUMN only runs when the column is absent).
+-- Safe to re-run on any existing DB.
+CREATE TABLE IF NOT EXISTS _migrations (id INTEGER PRIMARY KEY, name TEXT UNIQUE);
+INSERT OR IGNORE INTO _migrations (name) VALUES ('add_jobs_scored_to_scrape_runs');
+-- The actual migration is run by init_db.py / database.py on startup.
 
 -- ============================================================
 -- INDEXES

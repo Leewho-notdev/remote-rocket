@@ -49,6 +49,12 @@ def init_db() -> None:
     conn = get_connection()
     try:
         conn.executescript(schema)
+        # Migration: add jobs_scored if this is an older database
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(scrape_runs)")}
+        if "jobs_scored" not in cols:
+            conn.execute("ALTER TABLE scrape_runs ADD COLUMN jobs_scored INTEGER DEFAULT 0")
+            conn.commit()
+            log.info("Migration applied: added jobs_scored to scrape_runs")
         conn.commit()
         log.info(f"Database ready at {DB_PATH}")
     finally:
@@ -257,7 +263,8 @@ def start_scrape_run(conn: sqlite3.Connection) -> int:
 def finish_scrape_run(conn: sqlite3.Connection, run_id: int, stats: dict) -> None:
     """
     Update the scrape_runs row with final counts and status.
-    stats dict keys: jobs_fetched, jobs_new, jobs_updated, jobs_excluded, errors, error_details (list)
+    stats dict keys: jobs_fetched, jobs_new, jobs_updated, jobs_excluded,
+                     jobs_scored, errors, error_details (list)
     """
     status = "success"
     if stats.get("errors", 0) > 0:
@@ -272,6 +279,7 @@ def finish_scrape_run(conn: sqlite3.Connection, run_id: int, stats: dict) -> Non
             jobs_new       = :jobs_new,
             jobs_updated   = :jobs_updated,
             jobs_excluded  = :jobs_excluded,
+            jobs_scored    = :jobs_scored,
             errors         = :errors,
             error_details  = :error_details
         WHERE id = :run_id
@@ -281,6 +289,7 @@ def finish_scrape_run(conn: sqlite3.Connection, run_id: int, stats: dict) -> Non
         "jobs_new":      stats.get("jobs_new",      0),
         "jobs_updated":  stats.get("jobs_updated",  0),
         "jobs_excluded": stats.get("jobs_excluded", 0),
+        "jobs_scored":   stats.get("jobs_scored",   0),
         "errors":        stats.get("errors",        0),
         "error_details": json.dumps(stats.get("error_details", [])),
         "run_id":        run_id,
