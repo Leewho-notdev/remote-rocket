@@ -150,6 +150,73 @@ def update_last_seen(conn: sqlite3.Connection, url: str) -> None:
     conn.commit()
 
 
+def update_job_llm_fields(conn: sqlite3.Connection, job_id: int, extracted: dict) -> None:
+    """
+    Update an existing job row with fields returned by LLM extraction.
+    Called after extract_job_data() runs on a job that was already inserted.
+    Only updates fields that the LLM populates — preserves all source fields.
+    """
+    conn.execute("""
+        UPDATE jobs SET
+            employment_type  = COALESCE(:employment_type, employment_type),
+            salary_min       = COALESCE(:salary_min, salary_min),
+            salary_max       = COALESCE(:salary_max, salary_max),
+            salary_raw       = COALESCE(:salary_raw, salary_raw),
+            description_clean = COALESCE(:description_clean, description_clean),
+            requirements     = COALESCE(:requirements, requirements),
+            skills_detected  = COALESCE(:skills_detected, skills_detected),
+            raw_llm_response = :raw_llm_response,
+            relevance_score  = :relevance_score,
+            salary_score     = :salary_score,
+            is_fully_remote  = :is_fully_remote,
+            has_google_ads   = :has_google_ads,
+            has_msft_ads     = :has_msft_ads,
+            has_gtm          = :has_gtm,
+            has_gmc          = :has_gmc,
+            is_excluded      = :is_excluded,
+            exclusion_reason = COALESCE(:exclusion_reason, exclusion_reason),
+            date_updated     = datetime('now')
+        WHERE id = :job_id
+    """, {
+        "job_id":           job_id,
+        "employment_type":  extracted.get("employment_type"),
+        "salary_min":       extracted.get("salary_min"),
+        "salary_max":       extracted.get("salary_max"),
+        "salary_raw":       extracted.get("salary_raw"),
+        "description_clean": extracted.get("description_clean"),
+        "requirements":     _to_json(extracted.get("requirements")),
+        "skills_detected":  _to_json(extracted.get("skills_detected")),
+        "raw_llm_response": extracted.get("raw_llm_response"),
+        "relevance_score":  extracted.get("relevance_score"),
+        "salary_score":     extracted.get("salary_score"),
+        "is_fully_remote":  extracted.get("is_fully_remote", 1),
+        "has_google_ads":   extracted.get("has_google_ads", 0),
+        "has_msft_ads":     extracted.get("has_msft_ads", 0),
+        "has_gtm":          extracted.get("has_gtm", 0),
+        "has_gmc":          extracted.get("has_gmc", 0),
+        "is_excluded":      extracted.get("is_excluded", 0),
+        "exclusion_reason": extracted.get("exclusion_reason"),
+    })
+    conn.commit()
+
+
+def get_unscored_jobs(conn: sqlite3.Connection, limit: int = 100) -> list:
+    """
+    Return jobs that haven't been through LLM extraction yet.
+    Used to back-fill scores on jobs inserted without extraction.
+    """
+    rows = conn.execute("""
+        SELECT id, title, company, description_raw, description_clean,
+               is_hidden_gem, is_excluded, exclusion_reason
+        FROM jobs
+        WHERE relevance_score IS NULL
+          AND is_active = 1
+        ORDER BY is_hidden_gem DESC, date_scraped DESC
+        LIMIT ?
+    """, (limit,)).fetchall()
+    return [dict(row) for row in rows]
+
+
 def expire_stale_jobs(conn: sqlite3.Connection) -> int:
     """
     Mark jobs inactive if they haven't been seen for JOB_EXPIRY_DAYS.
