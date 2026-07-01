@@ -26,7 +26,7 @@ st.set_page_config(
 
 # ── Header ────────────────────────────────────────────────────────────────────
 st.title("🚀 Remote Rocket")
-st.caption("Your personal feed for remote performance marketing jobs. ✅ Auto-deploy working.")
+st.caption("Your personal feed for remote performance marketing jobs.")
 
 st.divider()
 
