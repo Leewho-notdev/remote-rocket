@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   scraper:
     build: ./scraper
@@ -19,9 +17,10 @@ services:
     ports:
       - "8501:8501"           # Access the UI at http://your-server-ip:8501
     volumes:
-      - ./app:/app            # Live reload: edits on host reflect instantly in container
-      - ./db:/app/db          # Reads the same database as the scraper
-      - ./config:/app/config  # Can read config for the Settings page
+      - ./app:/app             # Live reload: edits on host reflect instantly in container
+      - ./db:/app/db           # Reads the same database as the scraper
+      - ./config:/app/config   # Can read config for the Settings page
+      - ./prompts:/app/prompts # Resume tailoring prompts (edit without rebuilding)
     depends_on:
       - scraper
 

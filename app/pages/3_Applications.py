@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from datetime import date
 import streamlit as st
 from components.db import get_applications, upsert_application, update_application_field
+from components.resume_store import jobs_with_tailoring
 
 st.set_page_config(
     page_title="Applications — Remote Rocket",
@@ -67,6 +68,8 @@ if total == 0:
     )
     st.stop()
 
+tailored_ids = jobs_with_tailoring()
+
 metric_cols = st.columns(len(ALL_STATUSES))
 for col, (status_key, label) in zip(metric_cols, ALL_STATUSES):
     with col:
@@ -97,9 +100,10 @@ def _score_badge(score) -> str:
     return f"🔴 {score}"
 
 
-def render_kanban_card(app: dict, col_key: str) -> None:
+def render_kanban_card(app: dict, col_key: str, tailored_ids: set) -> None:
     """
     Render one application card.  col_key is used to build unique widget keys.
+    `tailored_ids` is the set of job_ids that already have a tailored version.
     All mutations call st.rerun() so the board refreshes immediately.
     """
     app_id  = app["id"]
@@ -140,6 +144,12 @@ def render_kanban_card(app: dict, col_key: str) -> None:
             existing_notes = app.get("notes") or ""
             upsert_application(job_id, new_status, existing_notes)
             st.rerun()
+
+        # ── Resume tailoring ──────────────────────────────────────────────────
+        tailor_label = "✨ Tailored resume" if job_id in tailored_ids else "✨ Tailor resume"
+        if st.button(tailor_label, key=f"tailor_{key}", use_container_width=True):
+            st.query_params["job_id"] = str(job_id)
+            st.switch_page("pages/6_Tailor.py")
 
         # ── Notes ─────────────────────────────────────────────────────────────
         with st.expander("Notes & details"):
@@ -203,7 +213,7 @@ for col_widget, (status_key, label) in zip(kanban_cols, ACTIVE_PIPELINE):
         st.divider()
         if apps_in_col:
             for app in apps_in_col:
-                render_kanban_card(app, col_key=status_key)
+                render_kanban_card(app, col_key=status_key, tailored_ids=tailored_ids)
         else:
             st.caption("Empty")
 
@@ -219,4 +229,4 @@ if closed_total > 0:
                 st.markdown(f"**{label}** ({len(apps_in_col)})")
                 st.divider()
                 for app in apps_in_col:
-                    render_kanban_card(app, col_key=status_key)
+                    render_kanban_card(app, col_key=status_key, tailored_ids=tailored_ids)

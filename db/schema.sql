@@ -67,10 +67,9 @@ CREATE TABLE IF NOT EXISTS jobs (
     _norm_title      TEXT,
     _norm_company    TEXT,
 
-    -- Phase 2: Resume tailoring (columns reserved — activate with ALTER TABLE when needed)
-    -- tailored_resume  TEXT,
-    -- cover_letter     TEXT,
-    -- resume_version   TEXT,
+    -- Phase 2 note: generated resume/cover-letter content is stored per-application
+    -- (see the applications table below), not on the job, so the same job can be
+    -- re-tailored over time without overwriting history.
 
     UNIQUE(url)
 );
@@ -100,12 +99,43 @@ CREATE TABLE IF NOT EXISTS applications (
     contact_email  TEXT,                -- Recruiter or hiring manager email
     notes          TEXT,                -- Free-text notes (interview prep, impressions, etc.)
 
-    -- Phase 2: Generated content (activate with ALTER TABLE when needed)
-    -- resume_used    TEXT,             -- Which resume version was used
-    -- cover_letter   TEXT,             -- Generated cover letter text
+    -- Phase 2 note: tailored resumes / cover letters are stored per-job in the
+    -- tailored_documents table below (versioned), not on the application row.
 
     created_at     TEXT DEFAULT (datetime('now')),
     updated_at     TEXT DEFAULT (datetime('now'))
+);
+
+-- ============================================================
+-- MASTER RESUME  (Phase 2)
+-- The user's single source-of-truth resume. Set up once (upload a
+-- PDF/DOCX or paste text); every tailoring run reads from it.
+-- Single logical row — we upsert id = 1.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS master_resume (
+    id              INTEGER PRIMARY KEY,           -- always 1
+    raw_text        TEXT NOT NULL,                 -- resume text (extracted or pasted)
+    structured_json TEXT,                          -- Claude-structured sections (JSON); NULL if structuring failed
+    source_filename TEXT,                          -- original filename if uploaded, else NULL
+    created_at      TEXT DEFAULT (datetime('now')),
+    updated_at      TEXT DEFAULT (datetime('now'))
+);
+
+-- ============================================================
+-- TAILORED DOCUMENTS  (Phase 2)
+-- Version history of generated resume + cover letter per job.
+-- Each row is one generation; the newest version per job is "current".
+-- Keyed by job_id so a job can be tailored from Browse Jobs before it
+-- ever becomes a tracked application.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS tailored_documents (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id           INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    version          INTEGER NOT NULL,             -- 1, 2, 3… per job
+    resume_md        TEXT,                         -- tailored resume (markdown)
+    cover_letter_md  TEXT,                         -- tailored cover letter (markdown)
+    notes            TEXT,                         -- regeneration guidance used for this version
+    created_at       TEXT DEFAULT (datetime('now'))
 );
 
 -- ============================================================
@@ -163,4 +193,5 @@ CREATE INDEX IF NOT EXISTS idx_jobs_source          ON jobs(source);
 CREATE INDEX IF NOT EXISTS idx_applications_job_id  ON applications(job_id);
 CREATE INDEX IF NOT EXISTS idx_applications_status  ON applications(status);
 CREATE INDEX IF NOT EXISTS idx_scrape_runs_started  ON scrape_runs(started_at);
+CREATE INDEX IF NOT EXISTS idx_tailored_job          ON tailored_documents(job_id, version);
 CREATE INDEX IF NOT EXISTS idx_jobs_norm_dedup      ON jobs(_norm_title, _norm_company, date_scraped);

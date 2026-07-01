@@ -55,6 +55,11 @@ def init_db() -> None:
             conn.execute("ALTER TABLE scrape_runs ADD COLUMN jobs_scored INTEGER DEFAULT 0")
             conn.commit()
             log.info("Migration applied: added jobs_scored to scrape_runs")
+
+        # Phase 2 tables (master_resume, tailored_documents) are created by the
+        # executescript(schema) call above via CREATE TABLE IF NOT EXISTS — no
+        # ALTER migration needed since they're new tables, not new columns.
+
         conn.commit()
         log.info(f"Database ready at {DB_PATH}")
     finally:

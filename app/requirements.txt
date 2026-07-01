@@ -1,2 +1,5 @@
 streamlit==1.41.1
 pyyaml==6.0.2
+anthropic==0.40.0     # Phase 2: resume tailoring (matches scraper pin)
+pypdf==5.1.0          # Phase 2: extract text from uploaded PDF resumes
+python-docx==1.1.2    # Phase 2: read uploaded .docx resumes + export tailored .docx

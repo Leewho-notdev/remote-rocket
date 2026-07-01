@@ -172,6 +172,11 @@ def render_job_card(job: dict, index: int) -> None:
                     st.success("Marked as applied!")
                     st.rerun()
 
+            # Tailor resume + cover letter for this role (Phase 2)
+            if st.button("✨ Tailor resume", key=f"tailor_{index}_{job_id}", use_container_width=True):
+                st.query_params["job_id"] = str(job_id)
+                st.switch_page("pages/6_Tailor.py")
+
             st.divider()
 
             # Full job details

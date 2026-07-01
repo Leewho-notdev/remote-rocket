@@ -84,6 +84,21 @@ Closed applications (Rejected / Withdrawn) are collapsed at the bottom.
 - **Config viewer** — live view of your keywords, company list, and environment settings
 - **Next run estimate** — countdown to the next scheduled scrape
 
+### My Resume (`/My Resume`)
+
+Set up your resume **once**. Upload a PDF or Word (.docx) file (or paste text) — Claude reads it and automatically organizes it into clean sections (summary, experience, skills, education). You get a read-only preview and a big **Replace / Re-upload** button; nothing to hand-edit. Both the raw text and the structured version are stored, so tailoring has high-quality input.
+
+### Tailor (`/Tailor`) — one tap, from anywhere
+
+Tailor a resume and cover letter to a specific job, powered by Claude (Sonnet). Built to be usable from your phone, in bed, with **no manual editing required**:
+
+- **One tap** — open any job on **Browse Jobs** or the **Applications** board, tap **✨ Tailor resume**, then hit **Generate**. Claude rewrites your resume to the job's priorities and drafts a matching cover letter — using *only* the real experience in your master resume (no invented history).
+- **Regenerate with a note** — not quite right? Add a nudge like *"lean into ROAS + Performance Max wins"* and regenerate. Every generation is kept as a version.
+- **Version history** — browse and download any past version per job.
+- **Export** — download clean, ATS-friendly `.docx` files for the resume and cover letter, or copy the text. Editing is available inline but never necessary.
+
+Tailored documents are versioned per job, so regenerating never overwrites your earlier work.
+
 ---
 
 ## Configuration
@@ -132,6 +147,8 @@ companies:
 | `JOB_EXPIRY_DAYS` | `45` | Days before unseen jobs are marked inactive |
 | `SALARY_MIN_DEFAULT` | `100000` | Default salary filter in the UI |
 | `CLAUDE_MODEL` | `claude-haiku-4-5-20251001` | Model used for extraction (haiku is fast and cheap) |
+| `RESUME_MODEL` | `claude-sonnet-4-6` | Model used for resume tailoring (quality over cost) |
+| `STRUCTURE_MODEL` | `claude-haiku-4-5-20251001` | Model for the one-time resume structuring pass on upload (cheap) |
 | `LOG_LEVEL` | `INFO` | Log verbosity (`DEBUG` for per-job detail) |
 
 ---
@@ -197,6 +214,10 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full technical design: schema, sc
 
 ---
 
-## Phase 2 (Planned)
+## Phase 2 (Shipped) ✅
 
-Resume tailoring and cover letter generation per job, triggered from the Applications pipeline. Schema columns are already reserved in `db/schema.sql`. Not yet implemented.
+Resume tailoring and cover letter generation per job. Set up a master resume once (**My Resume**), then tailor to any job in one tap (**Tailor**) with versioned history and ATS-friendly `.docx` export. Tuned to be mobile-friendly with no manual editing required.
+
+Prompts live in [`prompts/tailoring_prompts.yml`](prompts/tailoring_prompts.yml) — edit them to change output style without touching code or rebuilding.
+
+Next up: batch tailoring across a shortlist, an interview-prep brief per application, and optional structured resume editing.

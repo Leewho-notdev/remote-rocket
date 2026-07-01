@@ -958,22 +958,38 @@ After that: **zero maintenance required.** Containers restart automatically. New
 - [x] Docker Compose deployment
 - [x] Scheduled scraping every 12 hours
 
-### Phase 2 — Architecture Ready, Implement Later 🔜
+### Phase 2 — Shipped ✅
 
-**What's already in place:**
-- `raw_llm_response` column stores Claude's output for re-processing
-- `jobs` and `applications` tables have commented-out resume columns (one `ALTER TABLE` each)
-- Claude API already wired in — Phase 2 adds a new prompt, not a new integration
-- `relevance_score` per job already exists to prioritize tailoring effort
+Resume tailoring + cover letter generation, triggered from any job (Browse Jobs or the Applications board). Designed mobile-first with a one-tap flow and no required manual editing.
 
-**What Phase 2 adds:**
+**What shipped:**
 ```
-app/pages/5_Resume_Workshop.py      # Upload base resume, manage versions
-app/components/resume_generator.py  # Calls Claude: job + resume → tailored output
-scraper/resume_tailor.py            # Core: (job_id, resume_text) → tailored_resume, cover_letter
+app/pages/5_My_Resume.py             # Upload PDF/DOCX (or paste) → Claude structuring pass → read-only preview
+app/pages/6_Tailor.py                # One-tap tailoring: generate, regenerate-with-note, versions, .docx export
+app/components/resume_generator.py   # Claude: structuring pass (Haiku) + tailoring (Sonnet) + structured→markdown
+app/components/resume_store.py        # master_resume + tailored_documents data layer; self-healing schema
+app/components/resume_files.py        # PDF/DOCX text extraction (in) + markdown→.docx export (out)
+prompts/tailoring_prompts.yml        # Structuring + tailoring prompts, editable without a rebuild (mounted volume)
 ```
 
-**Phase 2 model:** Switch to `claude-sonnet-4-6` for resume tailoring — quality matters more than cost here.
+**Data model:**
+- `master_resume` — a single upserted row (id = 1) holding `raw_text`, `structured_json`, and source filename. On upload the text is extracted, then a lightweight Claude pass structures it into sections (contact, summary, experience, skills, education, certifications). Both raw and structured forms are stored; if structuring fails, `structured_json` is NULL and everything falls back to raw text.
+- `tailored_documents` — versioned generations **keyed by `job_id`** (`version`, `resume_md`, `cover_letter_md`, `notes`, `created_at`). Keying on the job (not the application) means a job can be tailored straight from Browse Jobs before it's ever saved. Regenerating adds a new version rather than overwriting.
+- Both are new tables, so no `ALTER` migration is needed — `CREATE TABLE IF NOT EXISTS` in `schema.sql` covers fresh + existing DBs. The app also self-heals the schema on load (`ensure_phase2_schema`, including an `ADD COLUMN structured_json` guard) so it works before the scraper container restarts.
+
+**Models:** tailoring uses `claude-sonnet-4-6` (`RESUME_MODEL`) — quality matters for a document you send to employers. The one-time structuring pass uses cheap `claude-haiku-4-5` (`STRUCTURE_MODEL`). Tailoring feeds Claude the clean structured render (`resume_text_for_tailoring`), falling back to raw text. Generation runs in the **app** container (interactive), not the scraper, so `anthropic`, `pypdf`, and `python-docx` are app dependencies.
+
+**Output:** editable markdown in the UI (edit optional), exported as ATS-friendly `.docx` for both resume and cover letter, plus copy-to-clipboard.
+
+**Design notes / deviations from the original briefs:**
+- The original architecture sketched a `scraper/resume_tailor.py` core, but tailoring is user-triggered and interactive, so it lives in the app container, not the batch scraper.
+- A product brief proposed a hand-edited structured master resume (`st.data_editor` experience table). We keep the **structured data** (Claude structures the resume on upload and stores it as `structured_json`, which improves tailoring and powers the read-only preview) but **dropped the manual editing** — hand-editing a table on a phone conflicts with the dead-simple, mobile, no-editing priority. Setup is upload → auto-structure → read-only preview + Replace.
+
+### Phase 3 — Ideas 🔜
+- Batch tailoring across a shortlist
+- Per-application interview-prep brief
+- Optional OCR fallback for image-only PDF resumes
+- Optional structured resume editing for power users
 
 ---
 
