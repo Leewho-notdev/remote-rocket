@@ -202,13 +202,15 @@ def render_job_card(job: dict, index: int) -> None:
                 st.subheader("Description")
                 desc = job.get("description_clean") or job.get("description_raw") or ""
                 if desc:
-                    import re
+                    import re, html
                     cleaned = re.sub(r"\\([^\w\s])", r"\1", desc[:5000])
-                    # Ensure single newlines become paragraph breaks in markdown
-                    cleaned = re.sub(r"\n", "\n\n", cleaned)
                     if len(desc) > 5000:
-                        cleaned += "\n\n…"
-                    st.markdown(cleaned)
+                        cleaned += "\n…"
+                    escaped = html.escape(cleaned).replace("\n", "<br>")
+                    st.markdown(
+                        f'<div style="line-height:1.7">{escaped}</div>',
+                        unsafe_allow_html=True,
+                    )
                 else:
                     st.caption("No description available.")
 
