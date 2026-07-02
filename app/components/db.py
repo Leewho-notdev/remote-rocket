@@ -99,8 +99,8 @@ def get_jobs(
     # Negative keywords — exclude jobs where title or company matches any term
     if negative_keywords:
         for nkw in negative_keywords:
-            conditions.append("(j.title NOT LIKE ? AND j.company NOT LIKE ?)")
-            val = f"%{nkw}%"
+            conditions.append("(LOWER(j.title) NOT LIKE ? AND LOWER(j.company) NOT LIKE ?)")
+            val = f"%{nkw.lower()}%"
             params.extend([val, val])
 
     # Skill flags
