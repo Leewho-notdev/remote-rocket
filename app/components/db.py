@@ -105,6 +105,32 @@ def get_jobs(
             val = f"%{nkw.lower()}%"
             params.extend([val, val, val])
 
+    # Exclude non-US locations (catches stale DB records that predate scraper filtering)
+    _NON_US_PATTERNS = [
+        "united kingdom", " uk ", "(uk)", "england", "scotland", "wales",
+        "canada", "ontario", "british columbia", "alberta", "toronto", "vancouver",
+        "australia", "sydney", "melbourne", "brisbane",
+        "new zealand",
+        "ireland", "dublin",
+        "germany", "berlin", "munich",
+        "france", "paris",
+        "netherlands", "amsterdam",
+        "spain", "madrid", "barcelona",
+        "india", "bangalore", "mumbai", "delhi",
+        "singapore",
+        "philippines",
+        "latin america", "latam",
+        "europe",
+        "emea",
+        "apac",
+        "metropolitan region",
+    ]
+    non_us_clauses = " AND ".join(
+        "LOWER(COALESCE(j.location,'')) NOT LIKE ?" for _ in _NON_US_PATTERNS
+    )
+    conditions.append(f"({non_us_clauses})")
+    params.extend(f"%{p}%" for p in _NON_US_PATTERNS)
+
     # Skill flags
     if has_google_ads:
         conditions.append("j.has_google_ads = 1")
