@@ -44,6 +44,7 @@ def get_jobs(
     has_gmc: bool           = False,
     include_excluded: bool  = False,
     include_inactive: bool  = False,
+    include_actioned: bool  = False,
     sort_by: str            = "relevance_score",
     limit: int              = 200,
 ) -> list:
@@ -60,6 +61,8 @@ def get_jobs(
         conditions.append("j.is_active = 1")
     if not include_excluded:
         conditions.append("j.is_excluded = 0")
+    if not include_actioned:
+        conditions.append("a.id IS NULL")
 
     # Salary
     if min_salary > 0:

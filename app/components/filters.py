@@ -165,6 +165,11 @@ def render_filters() -> dict:
 
     # ── Advanced toggles ──────────────────────────────────────────────────────
     with st.sidebar.expander("Advanced"):
+        include_actioned = st.checkbox(
+            "Show saved / applied jobs",
+            value=False,
+            help="Show jobs you've already saved or marked as applied.",
+        )
         include_excluded = st.checkbox(
             "Show excluded jobs",
             value=False,
@@ -187,6 +192,7 @@ def render_filters() -> dict:
         "has_msft_ads":     has_msft_ads,
         "has_gtm":          has_gtm,
         "has_gmc":          has_gmc,
+        "include_actioned":   include_actioned,
         "include_excluded":   include_excluded,
         "include_inactive":   include_inactive,
         "sort_by":            sort_by,

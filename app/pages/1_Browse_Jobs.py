@@ -53,6 +53,7 @@ jobs = get_jobs(
     has_msft_ads     = filters["has_msft_ads"],
     has_gtm          = filters["has_gtm"],
     has_gmc          = filters["has_gmc"],
+    include_actioned = filters["include_actioned"],
     include_excluded = filters["include_excluded"],
     include_inactive = filters["include_inactive"],
     sort_by          = filters["sort_by"],
