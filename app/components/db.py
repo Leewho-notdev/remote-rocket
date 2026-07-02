@@ -99,9 +99,11 @@ def get_jobs(
     # Negative keywords — exclude jobs where title or company matches any term
     if negative_keywords:
         for nkw in negative_keywords:
-            conditions.append("(LOWER(j.title) NOT LIKE ? AND LOWER(j.company) NOT LIKE ?)")
+            conditions.append(
+                "(LOWER(j.title) NOT LIKE ? AND LOWER(j.company) NOT LIKE ? AND LOWER(COALESCE(j.description_clean,'')) NOT LIKE ?)"
+            )
             val = f"%{nkw.lower()}%"
-            params.extend([val, val])
+            params.extend([val, val, val])
 
     # Skill flags
     if has_google_ads:
