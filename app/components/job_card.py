@@ -208,7 +208,10 @@ def render_job_card(job: dict, index: int) -> None:
                         cleaned += "\n…"
                     escaped = html.escape(cleaned).replace("\n", "<br>")
                     st.markdown(
-                        f'<div style="line-height:1.7">{escaped}</div>',
+                        f'<div style="max-height:350px;overflow-y:auto;'
+                        f'padding:12px 16px;border-radius:6px;'
+                        f'border:1px solid rgba(128,128,128,0.3);'
+                        f'line-height:1.7">{escaped}</div>',
                         unsafe_allow_html=True,
                     )
                 else:
