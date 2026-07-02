@@ -41,6 +41,7 @@ if not db_exists():
 st.title("📋 Browse Jobs")
 
 # ── Fetch jobs from DB using current filter state ─────────────────────────────
+st.sidebar.caption(f"DEBUG neg_kw: {filters['negative_keywords']}")
 jobs = get_jobs(
     min_salary       = filters["min_salary"],
     employment_types = filters["employment_types"],
