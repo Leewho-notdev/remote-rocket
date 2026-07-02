@@ -16,12 +16,14 @@ import streamlit as st
 from components.db import get_jobs, get_job_counts, db_exists
 from components.filters import render_filters
 from components.job_card import render_job_card
+from components.theme import apply_theme
 
 st.set_page_config(
     page_title="Browse Jobs — Remote Rocket",
     page_icon="📋",
     layout="wide",
 )
+apply_theme()
 
 # ── Sidebar filters ───────────────────────────────────────────────────────────
 filters = render_filters()

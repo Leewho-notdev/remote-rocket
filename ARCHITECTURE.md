@@ -42,7 +42,9 @@ remote-rocket/
 ├── app/                        # Streamlit web UI
 │   ├── Dockerfile
 │   ├── requirements.txt
-│   ├── streamlit_app.py        # Main entry point
+│   ├── Home.py                 # Main entry point (first sidebar nav item)
+│   ├── .streamlit/config.toml  # Base dark theme tokens
+│   ├── components/theme.py     # Lionheart dark theme CSS (apply_theme)
 │   ├── pages/
 │   │   ├── 1_Browse_Jobs.py    # Main job board view
 │   │   ├── 2_Saved_Jobs.py     # Bookmarked / shortlisted
@@ -654,7 +656,8 @@ The scraper exits with a clear error message if config is malformed — before w
 
 | File | Purpose |
 |---|---|
-| `streamlit_app.py` | App entry point, page config |
+| `Home.py` | App entry point, page config |
+| `components/theme.py` | Lionheart dark theme (fonts, colors, CSS) |
 | `pages/1_Browse_Jobs.py` | Main job board with sidebar filters |
 | `pages/2_Saved_Jobs.py` | Bookmarked / shortlisted jobs |
 | `pages/3_Applications.py` | Kanban-style application tracker |

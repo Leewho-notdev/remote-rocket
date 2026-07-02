@@ -1,12 +1,14 @@
 """
-streamlit_app.py
+Home.py
 Remote Rocket — main entry point.
 
-Streamlit's multi-page app structure picks up pages from the pages/ directory
-automatically. This file sets global page config and shows the home screen.
+Streamlit derives the first sidebar nav label from this file's name, so it is
+named Home.py (not streamlit_app.py) to read cleanly in the nav. Streamlit's
+multi-page structure picks up pages from the pages/ directory automatically.
+This file sets global page config and shows the home screen.
 
 Run via Docker:  docker compose up
-Run locally:     streamlit run streamlit_app.py
+Run locally:     streamlit run Home.py
 """
 
 import streamlit as st
@@ -16,6 +18,7 @@ import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 from components.db import get_job_counts, get_last_successful_run, db_exists
+from components.theme import apply_theme
 
 st.set_page_config(
     page_title="Remote Rocket",
@@ -23,6 +26,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+apply_theme()
 
 # ── Header ────────────────────────────────────────────────────────────────────
 st.title("🚀 Remote Rocket")

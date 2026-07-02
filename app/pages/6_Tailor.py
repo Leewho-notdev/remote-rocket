@@ -25,10 +25,12 @@ from components.resume_store import (
 )
 from components.resume_files import markdown_to_docx
 from components.resume_generator import generate_tailored, resume_text_for_tailoring
+from components.theme import apply_theme
 
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 st.set_page_config(page_title="Tailor — Remote Rocket", page_icon="✨", layout="centered")
+apply_theme()
 st.title("✨ Tailor Resume")
 
 # ── Guard: master resume must exist ────────────────────────────────────────────

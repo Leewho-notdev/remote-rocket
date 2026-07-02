@@ -1,0 +1,13 @@
+[theme]
+# Dark translation of the Lionheart Search brand.
+# Fine typography (Space Grotesk / Montserrat) + accent styling live in
+# components/theme.py, which every page loads via apply_theme().
+base = "dark"
+primaryColor = "#FF5E1A"
+backgroundColor = "#0D0D0D"
+secondaryBackgroundColor = "#161616"
+textColor = "#F4F2F0"
+font = "sans serif"
+
+[server]
+headless = true

@@ -15,8 +15,10 @@ from components.db import (
     get_last_successful_run,
     trigger_scrape,
 )
+from components.theme import apply_theme
 
 st.set_page_config(page_title="Settings — Remote Rocket", page_icon="⚙️", layout="wide")
+apply_theme()
 st.title("⚙️ Settings")
 
 # ── Manual scrape trigger ─────────────────────────────────────────────────────

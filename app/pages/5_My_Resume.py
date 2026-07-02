@@ -18,9 +18,11 @@ import streamlit as st
 from components.resume_store import get_master_resume, save_master_resume
 from components.resume_files import extract_text
 from components.resume_generator import structure_resume, structured_to_markdown
+from components.theme import apply_theme
 
 # Centered layout reads far better on mobile than wide/multi-column.
 st.set_page_config(page_title="My Resume — Remote Rocket", page_icon="📄", layout="centered")
+apply_theme()
 
 st.title("📄 My Resume")
 st.caption("Set this up once. Every job you tailor for uses it — no need to touch it again.")

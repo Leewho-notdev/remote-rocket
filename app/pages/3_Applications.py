@@ -14,12 +14,14 @@ from datetime import date
 import streamlit as st
 from components.db import get_applications, upsert_application, update_application_field
 from components.resume_store import jobs_with_tailoring
+from components.theme import apply_theme
 
 st.set_page_config(
     page_title="Applications — Remote Rocket",
     page_icon="📁",
     layout="wide",
 )
+apply_theme()
 st.title("📁 Applications Pipeline")
 st.caption("Track every application from saved → offer.")
 
