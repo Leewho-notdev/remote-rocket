@@ -233,10 +233,18 @@ def render_job_card(job: dict, index: int) -> None:
                 skills = job.get("skills_detected")
                 if skills and isinstance(skills, list):
                     st.subheader("Skills Detected")
-                    st.caption("  ·  ".join(skills))
+                    st.markdown("  ·  ".join(skills))
 
                 # Requirements (once LLM extraction runs)
                 requirements = job.get("requirements")
                 if requirements and isinstance(requirements, list):
                     st.subheader("Key Requirements")
-                    st.markdown("\n".join(f"- {r}" for r in requirements))
+                    import html as _html
+                    reqs_html = "".join(f"<li>{_html.escape(r)}</li>" for r in requirements)
+                    st.markdown(
+                        f'<div style="max-height:200px;overflow-y:auto;'
+                        f'padding:8px 12px;border-radius:6px;'
+                        f'border:1px solid rgba(128,128,128,0.3)">'
+                        f"<ul style='margin:0;padding-left:18px'>{reqs_html}</ul></div>",
+                        unsafe_allow_html=True,
+                    )
