@@ -19,7 +19,7 @@ from components.db import (
 )
 from components.theme import apply_theme
 
-st.set_page_config(page_title="Settings — Remote Rocket", page_icon="⚙️", layout="wide")
+st.set_page_config(page_title="Settings — Remote Rocket", page_icon="🚀", layout="wide")
 apply_theme()
 st.title("⚙️ Settings")
 

@@ -29,7 +29,7 @@ from components.theme import apply_theme
 
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
-st.set_page_config(page_title="Tailor — Remote Rocket", page_icon="✨", layout="centered")
+st.set_page_config(page_title="Tailor — Remote Rocket", page_icon="🚀", layout="centered")
 apply_theme()
 st.title("✨ Tailor Resume")
 

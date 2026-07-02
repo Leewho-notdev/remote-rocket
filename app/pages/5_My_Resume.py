@@ -21,7 +21,7 @@ from components.resume_generator import structure_resume, structured_to_markdown
 from components.theme import apply_theme
 
 # Centered layout reads far better on mobile than wide/multi-column.
-st.set_page_config(page_title="My Resume — Remote Rocket", page_icon="📄", layout="centered")
+st.set_page_config(page_title="My Resume — Remote Rocket", page_icon="🚀", layout="centered")
 apply_theme()
 
 st.title("📄 My Resume")

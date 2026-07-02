@@ -12,7 +12,7 @@ import streamlit as st
 from components.db import get_applications, upsert_application
 from components.theme import apply_theme
 
-st.set_page_config(page_title="Saved Jobs — Remote Rocket", page_icon="🔖", layout="wide")
+st.set_page_config(page_title="Saved Jobs — Remote Rocket", page_icon="🚀", layout="wide")
 apply_theme()
 st.title("🔖 Saved Jobs")
 st.caption("Bookmarked listings you haven't applied to yet.")

@@ -20,7 +20,7 @@ from components.theme import apply_theme
 
 st.set_page_config(
     page_title="Browse Jobs — Remote Rocket",
-    page_icon="📋",
+    page_icon="🚀",
     layout="wide",
 )
 apply_theme()
