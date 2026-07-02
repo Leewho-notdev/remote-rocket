@@ -20,6 +20,7 @@ Health monitoring signals (visible in the Settings → Scraper Log tab):
 """
 
 import logging
+import os
 import re
 import time
 import random
@@ -68,6 +69,39 @@ KEYWORD_CLAUSE = (
 )
 
 
+SCRAPINGBEE_API_KEY = os.getenv("SCRAPINGBEE_API_KEY", "")
+SCRAPINGBEE_URL     = "https://app.scrapingbee.com/api/v1/"
+
+
+def _google_search(query: str, num_results: int = 20) -> list[str]:
+    """
+    Search Google via ScrapingBee (if key set) or googlesearch-python fallback.
+    Returns a list of result URLs.
+    """
+    if SCRAPINGBEE_API_KEY:
+        resp = requests.get(
+            SCRAPINGBEE_URL,
+            params={
+                "api_key":    SCRAPINGBEE_API_KEY,
+                "search":     query,
+                "nb_results": num_results,
+                "language":   "en",
+                "country_code": "us",
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return [r["url"] for r in data.get("organic_results", []) if r.get("url")]
+    else:
+        try:
+            from googlesearch import search as google_search
+            return list(google_search(query, num_results=num_results, sleep_interval=2))
+        except ImportError:
+            log.error("[DISCOVERY] No search backend available. Set SCRAPINGBEE_API_KEY or install googlesearch-python.")
+            return []
+
+
 def run_discovery(existing_slugs: dict | None = None) -> list[dict]:
     """
     Main entry point. Searches Google for ATS job board URLs matching
@@ -82,19 +116,15 @@ def run_discovery(existing_slugs: dict | None = None) -> list[dict]:
     if existing_slugs is None:
         existing_slugs = {}
 
-    try:
-        from googlesearch import search as google_search
-    except ImportError:
-        log.error(
-            "[DISCOVERY] googlesearch-python not installed — discovery skipped. "
-            "Run: pip install googlesearch-python"
-        )
-        return []
+    if SCRAPINGBEE_API_KEY:
+        log.info("[DISCOVERY] Using ScrapingBee for Google searches")
+    else:
+        log.warning("[DISCOVERY] SCRAPINGBEE_API_KEY not set — using googlesearch-python (may be blocked by VPS IP)")
 
     all_jobs      = []
     total_queries = 0
     zero_results  = 0
-    boards_found  = set()   # (ats, slug) tuples — dedup across queries
+    boards_found  = set()
 
     for target in ATS_TARGETS:
         ats     = target["ats"]
@@ -106,8 +136,7 @@ def run_discovery(existing_slugs: dict | None = None) -> list[dict]:
         total_queries += 1
 
         try:
-            results = list(google_search(query, num_results=GOOGLE_RESULTS_PER_QUERY,
-                                         sleep_interval=2, advanced=False))
+            results = _google_search(query, num_results=GOOGLE_RESULTS_PER_QUERY)
         except Exception as e:
             log.warning(f"[DISCOVERY] Google search failed for {site}: {e}")
             results = []
