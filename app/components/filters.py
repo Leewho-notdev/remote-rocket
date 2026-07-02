@@ -101,16 +101,17 @@ def render_filters() -> dict:
     if "neg_keywords" not in st.session_state:
         st.session_state.neg_keywords = []
 
+    st.sidebar.markdown(
+        "<style>#neg_kw_form [data-testid='stFormSubmitButton']{display:none}</style>",
+        unsafe_allow_html=True,
+    )
     with st.sidebar.form("neg_kw_form", clear_on_submit=True, border=False):
-        col1, col2 = st.columns([4, 1])
-        with col1:
-            new_kw = st.text_input(
-                "Add keyword to exclude",
-                placeholder="e.g. tiktok",
-                label_visibility="collapsed",
-            )
-        with col2:
-            submitted = st.form_submit_button("Add")
+        new_kw = st.text_input(
+            "Add keyword to exclude",
+            placeholder="e.g. tiktok — press Enter to add",
+            label_visibility="collapsed",
+        )
+        submitted = st.form_submit_button("Add", disabled=False)
         if submitted and new_kw.strip():
             kw = new_kw.strip().lower()
             if kw not in st.session_state.neg_keywords:
