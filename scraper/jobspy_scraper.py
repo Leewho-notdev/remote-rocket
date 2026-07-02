@@ -16,8 +16,9 @@ from jobspy import scrape_jobs
 
 log = logging.getLogger("remote-rocket.jobspy")
 
-# Boards to search. Remove any that start causing persistent errors.
-TARGET_SITES = ["linkedin", "indeed", "glassdoor", "zip_recruiter"]
+# Boards to search. "google" aggregates smaller boards not on LinkedIn/Indeed.
+# Remove any that start causing persistent rate-limit errors.
+TARGET_SITES = ["linkedin", "indeed", "glassdoor", "zip_recruiter", "google"]
 
 # How many results to request per site per search term.
 # 25 is a safe default — high enough for coverage, low enough to avoid rate limits.
@@ -142,6 +143,12 @@ def _normalize_jobspy_record(raw: dict, search_term: str) -> dict | None:
         or ""
     )
 
+    location = _str(raw.get("location", "Remote"))
+
+    # Pre-filter obviously non-US locations before touching the LLM.
+    # Ambiguous locations (blank, "Remote") pass through — the LLM handles them.
+    is_non_us = not _is_us_or_unknown_location(location)
+
     return {
         "source":          source,
         "external_id":     _str(raw.get("id") or raw.get("job_id")),
@@ -149,7 +156,7 @@ def _normalize_jobspy_record(raw: dict, search_term: str) -> dict | None:
         "source_url":      _str(raw.get("job_url_direct") or url),
         "title":           title,
         "company":         company,
-        "location":        _str(raw.get("location", "Remote")),
+        "location":        location,
         "employment_type": employment_type,
         "salary_min":      salary_min,
         "salary_max":      salary_max,
@@ -170,8 +177,8 @@ def _normalize_jobspy_record(raw: dict, search_term: str) -> dict | None:
         "has_msft_ads":    0,
         "has_gtm":         0,
         "has_gmc":         0,
-        "is_excluded":     0,
-        "exclusion_reason": None,
+        "is_excluded":     1 if is_non_us else 0,
+        "exclusion_reason": f"Non-US location: {location}" if is_non_us else None,
         "date_posted":     date_posted,
         # Internal metadata for traceability
         "_search_term":    search_term,
@@ -191,12 +198,51 @@ def _map_employment_type(raw_type: str) -> str:
         "contractor":        "contract",
         "temporary":         "contract",
         "temp":              "contract",
+        "freelance":         "contract",
+        "consultant":        "contract",
         "parttime":          "part_time",
         "part_time":         "part_time",
         "part time":         "part_time",
         "internship":        "part_time",
     }
     return mapping.get(raw_type, "full_time")
+
+
+# Country names/patterns that clearly indicate a non-US job.
+# "Remote" alone is NOT excluded — most US remote jobs just say "Remote".
+_NON_US_LOCATION_PATTERNS = [
+    "united kingdom", " uk ", "(uk)", "england", "scotland", "wales",
+    "canada", "ontario", "british columbia", "alberta", "toronto", "vancouver",
+    "australia", "sydney", "melbourne", "brisbane",
+    "new zealand",
+    "ireland", "dublin",
+    "germany", "berlin", "munich",
+    "france", "paris",
+    "netherlands", "amsterdam",
+    "spain", "madrid", "barcelona",
+    "india", "bangalore", "mumbai", "delhi",
+    "singapore",
+    "philippines",
+    "latin america", "latam",
+    "europe",
+    "emea",
+    "apac",
+]
+
+
+def _is_us_or_unknown_location(location: str) -> bool:
+    """
+    Return True if the location is US-based or ambiguous (e.g. just "Remote").
+    Return False only when we can positively identify a non-US location.
+    This errs on the side of inclusion — the LLM catches anything we miss.
+    """
+    if not location:
+        return True
+    loc = location.lower()
+    for pattern in _NON_US_LOCATION_PATTERNS:
+        if pattern in loc:
+            return False
+    return True
 
 
 def _clean_text(text: str) -> str:

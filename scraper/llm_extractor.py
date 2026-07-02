@@ -112,6 +112,7 @@ Set is_excluded = true (and populate exclusion_reason) if ANY of the following a
 - Role is purely content marketing, SEO only, email marketing only, or PR
 - Role is clearly entry-level or explicitly requires fewer than 2 years of experience
 - Role is a software engineering, data science, or non-marketing position
+- Role is based outside the United States or explicitly excludes US applicants (e.g. UK, Canada, Australia, Europe, LATAM, APAC, EMEA)
 
 Do NOT exclude a role just because it mentions social media — only exclude if social media is the PRIMARY focus.
 

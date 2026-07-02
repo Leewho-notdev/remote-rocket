@@ -8,6 +8,7 @@
 # Each term is searched across LinkedIn, Indeed, Glassdoor, and ZipRecruiter.
 # Tip: be specific. Broad terms waste API budget on irrelevant results.
 search_terms:
+  # Full-time / permanent roles
   - "remote performance marketing manager"
   - "remote paid search manager"
   - "remote SEM manager"
@@ -21,6 +22,15 @@ search_terms:
   - "remote growth marketing paid search"
   - "remote digital marketing manager paid search"
   - "remote search engine marketing"
+  # Contract / freelance roles
+  - "remote paid search contract"
+  - "remote PPC contract"
+  - "remote paid media contract"
+  - "remote Google Ads freelance"
+  - "remote PPC freelance"
+  - "remote paid search consultant"
+  - "remote SEM consultant"
+  - "remote performance marketing consultant"
 
 # Keywords that signal a strong match when found in a job title.
 # Used by the LLM to boost relevance scores.
