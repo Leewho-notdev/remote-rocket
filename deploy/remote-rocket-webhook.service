@@ -1,0 +1,18 @@
+[Unit]
+Description=Remote Rocket GitHub webhook listener
+After=network.target docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/remote-rocket
+Environment=REPO_DIR=/root/remote-rocket
+Environment=WEBHOOK_PORT=9000
+# Set WEBHOOK_SECRET to match what you configure in GitHub
+Environment=WEBHOOK_SECRET=changeme
+ExecStart=/usr/bin/python3 /root/remote-rocket/deploy/webhook.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
