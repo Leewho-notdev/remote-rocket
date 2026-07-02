@@ -8,6 +8,7 @@ Keeping all filter logic in one place makes it easy to add new filters later.
 
 import os
 import streamlit as st
+from components.db import get_saved_neg_keywords, save_neg_keywords
 
 # Default minimum salary from environment (matches .env SALARY_MIN_DEFAULT)
 DEFAULT_SALARY_MIN = int(os.getenv("SALARY_MIN_DEFAULT", 100_000))
@@ -99,7 +100,7 @@ def render_filters() -> dict:
     # ── Negative keywords ─────────────────────────────────────────────────────
     st.sidebar.subheader("Negative Keywords")
     if "neg_keywords" not in st.session_state:
-        st.session_state.neg_keywords = []
+        st.session_state.neg_keywords = get_saved_neg_keywords()
 
     st.sidebar.markdown(
         "<style>#neg_kw_form [data-testid='stFormSubmitButton']{display:none}</style>",
@@ -129,6 +130,15 @@ def render_filters() -> dict:
         st.session_state.neg_keywords = list(negative_keywords)
     else:
         negative_keywords = []
+
+    col1, col2 = st.sidebar.columns(2)
+    if col1.button("💾 Save", key="save_neg_kw", use_container_width=True):
+        save_neg_keywords(st.session_state.neg_keywords)
+        st.sidebar.success("Saved!")
+    if col2.button("Clear", key="clear_neg_kw", use_container_width=True):
+        st.session_state.neg_keywords = []
+        save_neg_keywords([])
+        st.rerun()
 
     # ── Relevance score ───────────────────────────────────────────────────────
     st.sidebar.subheader("Relevance Score")

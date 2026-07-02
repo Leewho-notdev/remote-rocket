@@ -375,6 +375,44 @@ def trigger_scrape() -> bool:
 
 
 # ============================================================
+# USER PREFERENCES
+# ============================================================
+
+def _ensure_prefs_table(conn: sqlite3.Connection) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_prefs (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+
+
+def get_saved_neg_keywords() -> list[str]:
+    with get_connection() as conn:
+        _ensure_prefs_table(conn)
+        row = conn.execute(
+            "SELECT value FROM user_prefs WHERE key = 'neg_keywords'"
+        ).fetchone()
+        if row:
+            try:
+                return json.loads(row["value"])
+            except (json.JSONDecodeError, TypeError):
+                return []
+        return []
+
+
+def save_neg_keywords(keywords: list[str]) -> None:
+    with get_connection() as conn:
+        _ensure_prefs_table(conn)
+        conn.execute(
+            "INSERT OR REPLACE INTO user_prefs (key, value) VALUES ('neg_keywords', ?)",
+            (json.dumps(keywords),),
+        )
+        conn.commit()
+
+
+# ============================================================
 # INTERNAL HELPERS
 # ============================================================
 
