@@ -73,8 +73,8 @@ _CSS = f"""
     padding-top: 0.5rem;
 }}
 [data-testid="stSidebarNav"] a {{
-    border-radius: 6px;
-    margin: 1px 6px;
+    border-radius: 0;
+    margin: 1px 0;
 }}
 [data-testid="stSidebarNav"] a span {{
     font-family: 'Montserrat', sans-serif;
@@ -106,7 +106,7 @@ _CSS = f"""
     text-transform: uppercase;
     letter-spacing: 0.10em;
     font-size: 0.78rem;
-    border-radius: 4px;
+    border-radius: 0;
     border: 1px solid {BORDER};
     background: {SURFACE};
     color: {TEXT};
@@ -135,7 +135,7 @@ _CSS = f"""
 [data-testid="stMetric"] {{
     background: {SURFACE};
     border: 1px solid {BORDER};
-    border-radius: 8px;
+    border-radius: 0;
     padding: 1rem 1.15rem;
 }}
 [data-testid="stMetricLabel"] p {{
@@ -158,7 +158,7 @@ _CSS = f"""
     background: {SURFACE};
     border: 1px solid {BORDER};
     border-left: 3px solid {ORANGE};
-    border-radius: 8px;
+    border-radius: 0;
 }}
 
 /* ── Inputs ───────────────────────────────────────────────────────────── */
@@ -197,7 +197,7 @@ _CSS = f"""
 .stApp a:hover {{ color: {ORANGE_HI}; }}
 [data-testid="stExpander"] {{
     border: 1px solid {BORDER};
-    border-radius: 8px;
+    border-radius: 0;
     background: {SURFACE};
 }}
 
