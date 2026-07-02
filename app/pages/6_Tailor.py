@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import streamlit as st
 
-from components.db import get_job_by_id, get_applications
+from components.db import get_job_by_id, get_applications, upsert_application
 from components.resume_store import (
     has_master_resume,
     get_master_resume,
@@ -85,6 +85,28 @@ st.subheader(job.get("title", "Untitled"))
 st.caption(f"**{job.get('company', '—')}**")
 if job.get("url"):
     st.link_button("🔗 View listing", job["url"], use_container_width=True)
+
+# ── Application status controls ────────────────────────────────────────────────
+current_status = job.get("application_status")
+status_label = {
+    "saved":        "🔖 Saved",
+    "applied":      "✅ Applied",
+    "phone_screen": "📞 Phone Screen",
+    "interview":    "🎯 Interview",
+}.get(current_status, "Not tracked")
+
+st.caption(f"Status: **{status_label}**")
+btn_col1, btn_col2 = st.columns(2)
+with btn_col1:
+    if st.button("🔖 Mark Saved", use_container_width=True, disabled=(current_status == "saved")):
+        upsert_application(job_id, "saved")
+        st.toast("Marked as saved.")
+        st.rerun()
+with btn_col2:
+    if st.button("✅ Mark Applied", use_container_width=True, disabled=(current_status == "applied")):
+        upsert_application(job_id, "applied")
+        st.toast("Marked as applied.")
+        st.rerun()
 
 st.divider()
 
