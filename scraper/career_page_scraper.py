@@ -112,6 +112,16 @@ def detect_ats(company: dict) -> tuple[str, str]:
     if m:
         return "lever", m.group(1)
 
+    # Workable — extract slug from URL
+    # e.g. https://apply.workable.com/{slug}/
+    #      https://{slug}.workable.com/
+    m = re.search(r"apply\.workable\.com/([^/?#]+)", url)
+    if m:
+        return "workable", m.group(1)
+    m = re.search(r"([^./]+)\.workable\.com", url)
+    if m:
+        return "workable", m.group(1)
+
     # BambooHR — no standard public API
     if "bamboohr.com" in url:
         return "crawl4ai", ""
@@ -210,6 +220,34 @@ def fetch_lever(company: dict, slug: str) -> list[dict]:
     return jobs
 
 
+def fetch_workable(company: dict, slug: str) -> list[dict]:
+    url  = f"https://apply.workable.com/api/v1/widget/listings/{slug}"
+    log.info(f"  [Workable] {company['name']} → {url}")
+    resp = _get(url)
+    resp.raise_for_status()
+    raw_jobs = resp.json().get("results", [])
+    log.info(f"  [Workable] {company['name']} — {len(raw_jobs)} listings")
+    jobs = []
+    for raw in raw_jobs:
+        title    = (raw.get("title") or "").strip()
+        shortcode = raw.get("shortcode") or raw.get("id") or ""
+        job_url  = raw.get("url") or f"https://apply.workable.com/{slug}/j/{shortcode}/"
+        if not title or not shortcode:
+            continue
+        loc     = raw.get("location") or {}
+        is_remote = raw.get("remote", False)
+        location = "Remote" if is_remote else ", ".join(filter(None, [loc.get("city"), loc.get("country")]))
+        jobs.append(_build_job_dict(
+            company     = company,
+            title       = title,
+            location    = location or "Remote",
+            url         = job_url,
+            external_id = f"workable_{slug}_{shortcode}",
+            description = _strip_html(raw.get("description") or ""),
+        ))
+    return jobs
+
+
 def probe_ats_apis(company: dict, slug: str) -> tuple[list[dict], str]:
     """
     Try Greenhouse → Ashby → Lever in order with the given slug.
@@ -220,6 +258,7 @@ def probe_ats_apis(company: dict, slug: str) -> tuple[list[dict], str]:
         ("greenhouse", fetch_greenhouse),
         ("ashby",      fetch_ashby),
         ("lever",      fetch_lever),
+        ("workable",   fetch_workable),
     ]:
         try:
             jobs = fetcher(company, slug)
@@ -266,6 +305,11 @@ def run_career_page_scrape(companies: list[dict]) -> list[dict]:
             elif ats_type == "lever":
                 jobs = fetch_lever(company, slug)
                 log.info(f"  → {name}: {len(jobs)} jobs via Lever")
+                ats_jobs.extend(jobs)
+
+            elif ats_type == "workable":
+                jobs = fetch_workable(company, slug)
+                log.info(f"  → {name}: {len(jobs)} jobs via Workable")
                 ats_jobs.extend(jobs)
 
             elif ats_type == "probe":
