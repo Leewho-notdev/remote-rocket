@@ -154,11 +154,22 @@ _CSS = f"""
 }}
 
 /* ── Alerts / info cards ─────────────────────────────────────────────── */
-[data-testid="stAlert"] {{
-    background: {SURFACE};
-    border: 1px solid {BORDER};
-    border-left: 3px solid {ORANGE};
+[data-testid="stAlert"],
+[data-testid="stAlert"] > div,
+[data-testid="stAlertContentContainer"],
+div[role="alert"] {{
+    background: {SURFACE} !important;
     border-radius: 0 !important;
+    color: {TEXT} !important;
+}}
+[data-testid="stAlert"] {{
+    border: 1px solid {BORDER} !important;
+    border-left: 3px solid {ORANGE} !important;
+}}
+/* Override the blue/green/red info icon color */
+[data-testid="stAlert"] svg {{
+    color: {ORANGE} !important;
+    fill: {ORANGE} !important;
 }}
 
 /* ── Inputs ───────────────────────────────────────────────────────────── */
