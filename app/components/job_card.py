@@ -202,14 +202,12 @@ def render_job_card(job: dict, index: int) -> None:
                 st.subheader("Description")
                 desc = job.get("description_clean") or job.get("description_raw") or ""
                 if desc:
-                    # Truncate very long descriptions but allow full scroll
-                    st.text_area(
-                        label="",
-                        value=desc[:5000] + ("…" if len(desc) > 5000 else ""),
-                        height=300,
-                        disabled=True,
-                        label_visibility="collapsed",
-                    )
+                    import re
+                    # Unescape markdown artifacts left by scrapers (e.g. \- \* \[ \])
+                    cleaned = re.sub(r"\\([^\w\s])", r"\1", desc[:5000])
+                    if len(desc) > 5000:
+                        cleaned += "\n\n…"
+                    st.markdown(cleaned)
                 else:
                     st.caption("No description available.")
 
