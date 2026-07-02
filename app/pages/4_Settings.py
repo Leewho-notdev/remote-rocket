@@ -64,7 +64,17 @@ recent_check = get_recent_scrape_runs(limit=1)
 is_running = recent_check and recent_check[0].get("status") == "running"
 
 if is_running:
-    st.warning("⏳ Scrape in progress — page refreshes every 5 seconds...", icon="🔄")
+    st.warning("⏳ Scrape in progress — page refreshes every 5 seconds.", icon="🔄")
+    st.info(
+        "**Why does this take a while?**\n\n"
+        "- Job boards (LinkedIn, Indeed, Google Jobs, Glassdoor, ZipRecruiter) are searched "
+        "across 21 search terms with a 5-second pause between each to avoid rate limits — "
+        "that's ~2 minutes of waiting before results even come back.\n"
+        "- Company career pages (13 sites) are crawled individually.\n"
+        "- Every new job is then sent to Claude for relevance scoring, which adds ~1–2 seconds per job.\n\n"
+        "**Expect 15–25 minutes for a full run.** Subsequent runs are faster — most jobs are "
+        "already in the database and get skipped as duplicates early in the pipeline."
+    )
     time.sleep(5)
     st.rerun()
 
