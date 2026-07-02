@@ -8,6 +8,7 @@ Write operations are limited to application tracking (status, notes).
 import sqlite3
 import json
 import os
+from datetime import datetime
 
 DB_PATH = os.getenv("DB_PATH", "/app/db/jobs.db")
 
@@ -401,6 +402,63 @@ def trigger_scrape() -> bool:
         return True
     except OSError:
         return False
+
+
+# ============================================================
+# MANUAL JOB INSERTION
+# ============================================================
+
+def insert_manual_job(job: dict) -> int | None:
+    """
+    Insert a manually added job (from Add Job page) and return its row ID.
+    Returns None if the URL already exists in the DB.
+    """
+    now = datetime.utcnow().isoformat()
+    reqs   = json.dumps(job.get("requirements") or [])
+    skills = json.dumps(job.get("skills_detected") or [])
+
+    try:
+        with get_connection() as conn:
+            cursor = conn.execute("""
+                INSERT INTO jobs (
+                    source, external_id, url, source_url,
+                    title, company, location, employment_type,
+                    salary_min, salary_max, salary_raw, salary_currency,
+                    description_raw, description_clean, requirements, skills_detected,
+                    raw_llm_response,
+                    relevance_score, salary_score,
+                    is_fully_remote, is_hidden_gem,
+                    has_google_ads, has_msft_ads, has_gtm, has_gmc,
+                    is_excluded, exclusion_reason,
+                    is_active, last_seen_at,
+                    date_posted, date_scraped, created_at,
+                    _norm_title, _norm_company
+                ) VALUES (
+                    :source, :external_id, :url, :source_url,
+                    :title, :company, :location, :employment_type,
+                    :salary_min, :salary_max, :salary_raw, :salary_currency,
+                    :description_raw, :description_clean, :requirements, :skills_detected,
+                    :raw_llm_response,
+                    :relevance_score, :salary_score,
+                    :is_fully_remote, :is_hidden_gem,
+                    :has_google_ads, :has_msft_ads, :has_gtm, :has_gmc,
+                    :is_excluded, :exclusion_reason,
+                    1, :now,
+                    :date_posted, :now, :now,
+                    :norm_title, :norm_company
+                )
+            """, {
+                **job,
+                "requirements":    reqs,
+                "skills_detected": skills,
+                "now":             now,
+                "norm_title":      job.get("title", "").lower().strip(),
+                "norm_company":    job.get("company", "").lower().strip(),
+            })
+            conn.commit()
+            return cursor.lastrowid
+    except Exception:
+        return None
 
 
 # ============================================================

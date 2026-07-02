@@ -1,4 +1,6 @@
 streamlit==1.41.1
+requests>=2.31.0
+beautifulsoup4>=4.12.0
 pyyaml==6.0.2
 anthropic==0.40.0     # Phase 2: resume tailoring (matches scraper pin)
 pypdf==5.1.0          # Phase 2: extract text from uploaded PDF resumes
