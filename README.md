@@ -221,3 +221,4 @@ Resume tailoring and cover letter generation per job. Set up a master resume onc
 Prompts live in [`prompts/tailoring_prompts.yml`](prompts/tailoring_prompts.yml) — edit them to change output style without touching code or rebuilding.
 
 Next up: batch tailoring across a shortlist, an interview-prep brief per application, and optional structured resume editing.
+
