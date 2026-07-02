@@ -89,10 +89,10 @@ _CSS = f"""
 [data-testid="stSidebarNav"] a:hover span {{
     color: {TEXT};
 }}
-/* Active page: orange marker + brighter text */
+/* Active page: orange left border + brighter text */
 [data-testid="stSidebarNav"] a[aria-current="page"] {{
     background: {SURFACE_2};
-    box-shadow: inset 3px 0 0 {ORANGE};
+    border-left: 3px solid {ORANGE} !important;
 }}
 [data-testid="stSidebarNav"] a[aria-current="page"] span {{
     color: {TEXT};
@@ -191,15 +191,41 @@ _CSS = f"""
     background: {ORANGE};
 }}
 
-/* ── Dividers, links, expanders ──────────────────────────────────────── */
-.stApp hr {{ border-color: {BORDER}; }}
-.stApp a {{ color: {ORANGE}; }}
-.stApp a:hover {{ color: {ORANGE_HI}; }}
-[data-testid="stExpander"] {{
-    border: 1px solid {BORDER};
+/* ── Job card containers (st.container(border=True)) ─────────────────── */
+[data-testid="stVerticalBlockBorderWrapper"],
+[data-testid="stVerticalBlockBorderWrapper"] > div {{
+    border-radius: 0 !important;
+}}
+
+/* ── Expander — target all nested elements ────────────────────────────── */
+[data-testid="stExpander"],
+[data-testid="stExpander"] > *,
+[data-testid="stExpander"] details,
+[data-testid="stExpander"] summary,
+[data-testid="stExpanderDetails"] {{
     border-radius: 0 !important;
     background: {SURFACE};
 }}
+[data-testid="stExpander"] {{
+    border: 1px solid {BORDER};
+}}
+
+/* ── Multiselect / tag pills ─────────────────────────────────────────── */
+[data-baseweb="tag"] {{
+    border-radius: 0 !important;
+}}
+
+/* ── BaseWeb dropdowns, popups ───────────────────────────────────────── */
+[data-baseweb="popover"],
+[data-baseweb="menu"],
+[data-baseweb="select"] > div {{
+    border-radius: 0 !important;
+}}
+
+/* ── Dividers, links ──────────────────────────────────────────────────── */
+.stApp hr {{ border-color: {BORDER}; }}
+.stApp a {{ color: {ORANGE}; }}
+.stApp a:hover {{ color: {ORANGE_HI}; }}
 
 /* Trim Streamlit's default top padding for a tighter header */
 .stApp [data-testid="stMainBlockContainer"] {{
