@@ -204,6 +204,8 @@ def render_job_card(job: dict, index: int) -> None:
                 if desc:
                     import re, html
                     cleaned = re.sub(r"\\([^\w\s])", r"\1", desc[:5000])
+                    cleaned = re.sub(r"\*\*(.+?)\*\*", r"\1", cleaned)
+                    cleaned = re.sub(r"\*(.+?)\*", r"\1", cleaned)
                     if len(desc) > 5000:
                         cleaned += "\n…"
                     escaped = html.escape(cleaned).replace("\n", "<br>")
