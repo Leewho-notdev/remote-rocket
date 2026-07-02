@@ -306,6 +306,34 @@ def get_last_successful_run() -> dict:
 
 
 # ============================================================
+# JOB DELETION
+# ============================================================
+
+def delete_job(job_id: int) -> None:
+    """Permanently delete a job and its application record (if any)."""
+    conn = get_connection()
+    try:
+        conn.execute("DELETE FROM applications WHERE job_id = ?", (job_id,))
+        conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def delete_all_jobs() -> int:
+    """Permanently delete every job and application. Returns the count deleted."""
+    conn = get_connection()
+    try:
+        count = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+        conn.execute("DELETE FROM applications")
+        conn.execute("DELETE FROM jobs")
+        conn.commit()
+        return count
+    finally:
+        conn.close()
+
+
+# ============================================================
 # MANUAL SCRAPE TRIGGER
 # ============================================================
 

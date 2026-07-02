@@ -15,6 +15,7 @@ from components.db import (
     get_recent_scrape_runs,
     get_last_successful_run,
     trigger_scrape,
+    delete_all_jobs,
 )
 from components.theme import apply_theme
 
@@ -56,6 +57,28 @@ with col_info:
             st.info(f"Scrape interval: every {SCRAPE_INTERVAL_HOURS} hour(s).")
     else:
         st.info(f"Scrape interval: every {SCRAPE_INTERVAL_HOURS} hour(s).")
+
+st.divider()
+
+# ── Danger zone ───────────────────────────────────────────────────────────────
+with st.expander("⚠️ Danger Zone"):
+    st.write("**Delete all jobs** — permanently removes every job and application from the database. Use this to start fresh before a new scrape.")
+    if st.button("🗑 Delete All Jobs", type="secondary"):
+        st.session_state["confirm_delete_all"] = True
+
+    if st.session_state.get("confirm_delete_all"):
+        st.warning("This will permanently delete every job and application record. There is no undo.")
+        da_col1, da_col2 = st.columns(2)
+        with da_col1:
+            if st.button("Yes, delete everything", type="primary"):
+                count = delete_all_jobs()
+                st.session_state["confirm_delete_all"] = False
+                st.success(f"Deleted {count} jobs and all associated applications.")
+                st.rerun()
+        with da_col2:
+            if st.button("Cancel"):
+                st.session_state["confirm_delete_all"] = False
+                st.rerun()
 
 st.divider()
 

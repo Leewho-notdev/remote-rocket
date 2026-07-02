@@ -7,7 +7,7 @@ All rendering logic lives here so the page file stays clean.
 """
 
 import streamlit as st
-from components.db import upsert_application
+from components.db import upsert_application, delete_job
 
 
 # Colour-coded relevance score indicator
@@ -153,7 +153,7 @@ def render_job_card(job: dict, index: int) -> None:
         with st.expander("View details & actions"):
 
             # Action buttons row
-            btn_col1, btn_col2, btn_col3 = st.columns(3)
+            btn_col1, btn_col2, btn_col3, btn_col4 = st.columns(4)
 
             with btn_col1:
                 url = job.get("url", "")
@@ -171,6 +171,22 @@ def render_job_card(job: dict, index: int) -> None:
                     upsert_application(job_id, "applied")
                     st.success("Marked as applied!")
                     st.rerun()
+
+            with btn_col4:
+                if st.button("🗑 Delete", key=f"delete_{index}_{job_id}", use_container_width=True):
+                    st.session_state[f"confirm_delete_{job_id}"] = True
+
+            if st.session_state.get(f"confirm_delete_{job_id}"):
+                st.warning("Are you sure? This permanently removes this job.")
+                confirm_col1, confirm_col2 = st.columns(2)
+                with confirm_col1:
+                    if st.button("Yes, delete it", key=f"confirm_yes_{index}_{job_id}", use_container_width=True):
+                        delete_job(job_id)
+                        st.rerun()
+                with confirm_col2:
+                    if st.button("Cancel", key=f"confirm_no_{index}_{job_id}", use_container_width=True):
+                        st.session_state[f"confirm_delete_{job_id}"] = False
+                        st.rerun()
 
             # Tailor resume + cover letter for this role (Phase 2)
             if st.button("✨ Tailor resume", key=f"tailor_{index}_{job_id}", use_container_width=True):
