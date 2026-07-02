@@ -98,12 +98,30 @@ def render_filters() -> dict:
 
     # ── Negative keywords ─────────────────────────────────────────────────────
     st.sidebar.subheader("Negative Keywords")
-    negative_keywords_raw = st.sidebar.text_input(
-        "Exclude title or company containing",
-        placeholder="e.g. meta, tiktok, snapchat",
-        help="Comma-separated. Hides any job where the title or company name contains any of these terms.",
-    )
-    negative_keywords = [kw.strip() for kw in negative_keywords_raw.split(",") if kw.strip()]
+    if "neg_keywords" not in st.session_state:
+        st.session_state.neg_keywords = []
+
+    with st.sidebar.form("neg_kw_form", clear_on_submit=True, border=False):
+        new_kw = st.text_input(
+            "Add keyword to exclude",
+            placeholder="e.g. tiktok — press Enter to add",
+            label_visibility="collapsed",
+        )
+        if st.form_submit_button("Add", use_container_width=True) and new_kw.strip():
+            kw = new_kw.strip().lower()
+            if kw not in st.session_state.neg_keywords:
+                st.session_state.neg_keywords.append(kw)
+
+    if st.session_state.neg_keywords:
+        negative_keywords = st.sidebar.multiselect(
+            "Active — click × to remove",
+            options=st.session_state.neg_keywords,
+            default=st.session_state.neg_keywords,
+            label_visibility="visible",
+        )
+        st.session_state.neg_keywords = negative_keywords
+    else:
+        negative_keywords = []
 
     # ── Relevance score ───────────────────────────────────────────────────────
     st.sidebar.subheader("Relevance Score")
