@@ -233,12 +233,10 @@ def render_job_card(job: dict, index: int) -> None:
                 skills = job.get("skills_detected")
                 if skills and isinstance(skills, list):
                     st.subheader("Skills Detected")
-                    for skill in skills:
-                        st.markdown(f"- {skill}")
+                    st.caption("  ·  ".join(skills))
 
                 # Requirements (once LLM extraction runs)
                 requirements = job.get("requirements")
                 if requirements and isinstance(requirements, list):
                     st.subheader("Key Requirements")
-                    for req in requirements:
-                        st.markdown(f"- {req}")
+                    st.markdown("\n".join(f"- {r}" for r in requirements))
