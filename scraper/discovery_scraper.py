@@ -88,8 +88,9 @@ def _google_search(query: str, num_results: int = 20) -> list[str]:
         resp = requests.get(
             SCRAPINGBEE_URL,
             params={
-                "api_key": SCRAPINGBEE_API_KEY,
-                "url":     google_url,
+                "api_key":    SCRAPINGBEE_API_KEY,
+                "url":        google_url,
+                "render_js":  "true",
                 "extract_rules": '{"urls":{"selector":"a[href]","type":"list","output":"@href"}}',
             },
             timeout=60,
@@ -198,10 +199,10 @@ def run_discovery(existing_slugs: dict | None = None) -> list[dict]:
 
     # ── Health check ──────────────────────────────────────────────────────────
     if total_queries > 0 and zero_results / total_queries > 0.5:
+        backend = "ScrapingBee" if SCRAPINGBEE_API_KEY else "googlesearch-python"
         log.warning(
             f"[DISCOVERY] ⚠️  HEALTH WARNING: {zero_results}/{total_queries} queries returned "
-            f"0 results. Google is likely rate-limiting or CAPTCHAing requests. "
-            f"Consider switching to ScrapingBee (set SCRAPINGBEE_API_KEY in .env)."
+            f"0 results via {backend}. Google is likely rate-limiting or CAPTCHAing requests."
         )
     else:
         log.info(
