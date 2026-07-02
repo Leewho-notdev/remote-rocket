@@ -108,7 +108,7 @@ def render_filters() -> dict:
     with st.sidebar.form("neg_kw_form", clear_on_submit=True, border=False):
         new_kw = st.text_input(
             "Add keyword to exclude",
-            placeholder="e.g. tiktok — press Enter to add",
+            placeholder="e.g. tiktok, meta",
             label_visibility="collapsed",
         )
         submitted = st.form_submit_button("Add", disabled=False)
