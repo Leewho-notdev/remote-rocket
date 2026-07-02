@@ -310,11 +310,21 @@ def get_last_successful_run() -> dict:
 # ============================================================
 
 def delete_job(job_id: int) -> None:
-    """Permanently delete a job and its application record (if any)."""
+    """
+    Dismiss a job so it never reappears.
+    We keep the row as a tombstone so the deduplicator blocks reinsertion
+    on future scrapes — actually deleting the row would let it come back.
+    """
     conn = get_connection()
     try:
+        conn.execute("""
+            UPDATE jobs
+            SET is_excluded = 1,
+                is_active   = 0,
+                exclusion_reason = 'Dismissed by user'
+            WHERE id = ?
+        """, (job_id,))
         conn.execute("DELETE FROM applications WHERE job_id = ?", (job_id,))
-        conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
         conn.commit()
     finally:
         conn.close()
