@@ -118,13 +118,15 @@ def render_filters() -> dict:
                 st.session_state.neg_keywords.append(kw)
 
     if st.session_state.neg_keywords:
+        ms_key = "neg_kw_ms_" + "_".join(sorted(st.session_state.neg_keywords))
         negative_keywords = st.sidebar.multiselect(
             "Active — click × to remove",
             options=st.session_state.neg_keywords,
             default=st.session_state.neg_keywords,
+            key=ms_key,
             label_visibility="visible",
         )
-        st.session_state.neg_keywords = negative_keywords
+        st.session_state.neg_keywords = list(negative_keywords)
     else:
         negative_keywords = []
 
