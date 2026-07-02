@@ -16,9 +16,9 @@ from jobspy import scrape_jobs
 
 log = logging.getLogger("remote-rocket.jobspy")
 
-# Boards to search. "google" aggregates smaller boards not on LinkedIn/Indeed.
-# Remove any that start causing persistent rate-limit errors.
-TARGET_SITES = ["linkedin", "indeed", "glassdoor", "zip_recruiter", "google"]
+# Glassdoor and ZipRecruiter consistently 403 — removed.
+# Google Jobs aggregates smaller boards not on LinkedIn/Indeed.
+TARGET_SITES = ["linkedin", "indeed", "google"]
 
 # How many results to request per site per search term.
 # 25 is a safe default — high enough for coverage, low enough to avoid rate limits.
