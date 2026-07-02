@@ -35,6 +35,7 @@ from database import (
 from deduplicator import check_and_handle_duplicate, should_pre_exclude
 from jobspy_scraper import fetch_jobs
 from career_page_scraper import run_career_page_scrape, extract_jobs_from_page
+from discovery_scraper import run_discovery, build_existing_slugs
 from llm_extractor import extract_job_data, should_extract
 
 # ── Logging ───────────────────────────────────────────────────────────────────
@@ -103,7 +104,19 @@ def run_scrape() -> dict:
         for job in board_jobs:
             _process_raw_job(conn, job, title_exclusions, stats, new_job_ids)
 
-        # ── Step B: Career page scraping (Crawl4AI) ───────────────────────────
+        # ── Step B: ATS discovery via Google site: search ─────────────────────
+        log.info("[Discovery] Starting Google ATS discovery …")
+        try:
+            existing_slugs  = build_existing_slugs(companies)
+            discovered_jobs = run_discovery(existing_slugs)
+            stats["jobs_fetched"] += len(discovered_jobs)
+            log.info(f"[Discovery] {len(discovered_jobs)} raw jobs from discovery")
+            for job in discovered_jobs:
+                _process_raw_job(conn, job, title_exclusions, stats, new_job_ids)
+        except Exception as e:
+            _log_error(stats, f"[Discovery] Failed entirely: {e}")
+
+        # ── Step C: Career page scraping (watchlist) ───────────────────────────
         log.info(f"[Career Pages] Starting career page scrape …")
         try:
             page_results = run_career_page_scrape(companies)

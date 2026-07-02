@@ -6,3 +6,4 @@ tenacity==9.0.0
 pyyaml==6.0.2
 pandas>=2.0.0   # jobspy returns DataFrames; also used for NaN checks in normalization
 requests>=2.31.0  # ATS API calls (Greenhouse, Lever)
+googlesearch-python>=1.2.3  # Google site: search for ATS discovery
