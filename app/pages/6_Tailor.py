@@ -40,6 +40,15 @@ if not has_master_resume():
 
 # ── Resolve which job we're tailoring for ──────────────────────────────────────
 def _resolve_job_id() -> int | None:
+    # Prefer the value handed off via session_state — reliable across page
+    # switches (a query param set right before st.switch_page can be dropped).
+    jid = st.session_state.get("tailor_job_id")
+    if jid is not None:
+        try:
+            return int(jid)
+        except (ValueError, TypeError):
+            pass
+    # Fall back to a ?job_id= query param (bookmarked or deep link).
     qp = st.query_params.get("job_id")
     if qp:
         try:

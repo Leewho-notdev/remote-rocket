@@ -148,7 +148,7 @@ def render_kanban_card(app: dict, col_key: str, tailored_ids: set) -> None:
         # ── Resume tailoring ──────────────────────────────────────────────────
         tailor_label = "✨ Tailored resume" if job_id in tailored_ids else "✨ Tailor resume"
         if st.button(tailor_label, key=f"tailor_{key}", use_container_width=True):
-            st.query_params["job_id"] = str(job_id)
+            st.session_state["tailor_job_id"] = job_id
             st.switch_page("pages/6_Tailor.py")
 
         # ── Notes ─────────────────────────────────────────────────────────────
