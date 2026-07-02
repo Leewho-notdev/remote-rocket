@@ -1,14 +1,16 @@
 """
 scraper/career_page_scraper.py
-Fetches "hidden gem" jobs directly from company ATS (Applicant Tracking System) APIs
-and company career pages.
+Fetches "hidden gem" jobs directly from company ATS APIs and career pages.
 
-Priority order per company:
-  1. Greenhouse API  — clean JSON, no browser, 100% reliable
-  2. Lever API       — clean JSON, no browser, 100% reliable
-  3. Crawl4AI        — headless browser fallback for companies without a known ATS
+ATS detection order (fully automatic — no manual slug config needed):
+  1. Detect ATS type from the careers_url (greenhouse.io, ashbyhq.com, lever.co, workday)
+  2. Extract slug from the URL when possible
+  3. If slug can't be extracted, probe each API with a best-guess slug derived from
+     the company name, trying Greenhouse → Ashby → Lever in order
+  4. Fall back to Crawl4AI if all API probes fail or ATS is Workday
 
-Configure each company's ATS type and slug in config/companies.yml.
+The ats/ats_slug fields in companies.yml are still respected when provided,
+but are no longer required. Auto-detection handles everything.
 """
 
 import asyncio
@@ -30,37 +32,21 @@ from tenacity import (
 
 log = logging.getLogger("remote-rocket.career-pages")
 
-# Polite delay between requests (seconds)
-MIN_DELAY_SECS = 2
-MAX_DELAY_SECS = 4
-
-# Crawl4AI page timeout (seconds) — only used for crawl4ai fallback
-PAGE_TIMEOUT = 30
-
-# Max content length passed to LLM for crawl4ai fallback
+MIN_DELAY_SECS   = 2
+MAX_DELAY_SECS   = 4
+PAGE_TIMEOUT     = 30
 MAX_CONTENT_CHARS = 12_000
-
-# HTTP request timeout for ATS API calls
 ATS_TIMEOUT_SECS = 15
 
-# Rotation counter for standard-priority companies
 _run_counter = 0
 
 
 # ── Company selection ─────────────────────────────────────────────────────────
 
 def select_companies_for_run(companies: list[dict]) -> list[dict]:
-    """
-    Decide which companies to scrape this run.
-    high_priority=true → always included
-    high_priority=false → included on even-numbered runs only
-    """
     global _run_counter
     _run_counter += 1
-
-    selected = []
-    skipped  = 0
-
+    selected, skipped = [], 0
     for company in companies:
         if company.get("high_priority", False):
             selected.append(company)
@@ -68,209 +54,270 @@ def select_companies_for_run(companies: list[dict]) -> list[dict]:
             selected.append(company)
         else:
             skipped += 1
-
-    log.info(
-        f"Career pages: {len(selected)} selected for this run "
-        f"({skipped} standard-priority skipped — run #{_run_counter})"
-    )
+    log.info(f"Career pages: {len(selected)} selected ({skipped} standard skipped — run #{_run_counter})")
     return selected
 
 
-# ── Greenhouse API ────────────────────────────────────────────────────────────
+# ── ATS auto-detection ────────────────────────────────────────────────────────
 
-@retry(
-    retry=retry_if_exception_type((requests.ConnectionError, requests.Timeout)),
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=2, min=3, max=20),
-    before_sleep=before_sleep_log(log, logging.WARNING),
-    reraise=True,
-)
-def fetch_greenhouse(company: dict) -> list[dict]:
-    """
-    Fetch job listings from the Greenhouse boards API.
-    Returns a list of normalized job dicts ready for the main pipeline.
+def _slug_from_name(name: str) -> str:
+    """Derive a best-guess API slug from a company display name."""
+    slug = name.lower()
+    slug = re.sub(r"[^a-z0-9]", "", slug)   # strip spaces, punctuation
+    return slug
 
-    API docs: https://developers.greenhouse.io/job-board.html
-    Verify slug: https://boards.greenhouse.io/{slug}/jobs
+
+def detect_ats(company: dict) -> tuple[str, str]:
     """
-    slug = company["ats_slug"]
+    Return (ats_type, slug) for a company using this priority:
+    1. Explicit ats/ats_slug in companies.yml (backward-compatible)
+    2. Pattern-match on careers_url
+    3. Slug derived from company name (used for API probing)
+
+    Returns ("crawl4ai", "") when we know no API will work (e.g. Workday).
+    Returns ("probe", slug) when we should try each API with the derived slug.
+    """
+    explicit_ats  = (company.get("ats") or "").lower()
+    explicit_slug = company.get("ats_slug") or ""
+    careers_url   = company.get("careers_url") or ""
+    name          = company.get("name", "")
+
+    # Respect explicit config when provided
+    if explicit_ats and explicit_ats != "auto":
+        return explicit_ats, explicit_slug
+
+    url = careers_url.lower()
+
+    # Workday — no public API, always Crawl4AI
+    if "myworkdayjobs.com" in url or "workday.com" in url:
+        log.info(f"  [{name}] Detected Workday — using Crawl4AI")
+        return "crawl4ai", ""
+
+    # Greenhouse — extract slug from URL path
+    # e.g. https://boards.greenhouse.io/{slug}/jobs/...
+    #      https://job-boards.greenhouse.io/{slug}/jobs/...
+    m = re.search(r"greenhouse\.io/([^/?#]+)", url)
+    if m:
+        return "greenhouse", m.group(1)
+
+    # Ashby — extract slug from URL
+    # e.g. https://jobs.ashbyhq.com/{slug}/...
+    m = re.search(r"ashbyhq\.com/([^/?#]+)", url)
+    if m:
+        return "ashby", m.group(1)
+
+    # Lever — extract slug from URL
+    # e.g. https://jobs.lever.co/{slug}/...
+    m = re.search(r"lever\.co/([^/?#]+)", url)
+    if m:
+        return "lever", m.group(1)
+
+    # BambooHR — no standard public API
+    if "bamboohr.com" in url:
+        return "crawl4ai", ""
+
+    # iCIMS — no standard public API
+    if "icims.com" in url:
+        return "crawl4ai", ""
+
+    # No ATS detected from URL — probe APIs with a derived slug
+    return "probe", _slug_from_name(name)
+
+
+# ── ATS API fetchers ──────────────────────────────────────────────────────────
+
+def _get(url: str) -> requests.Response:
+    """Simple GET with a browser-like User-Agent."""
+    return requests.get(url, timeout=ATS_TIMEOUT_SECS, headers={"User-Agent": "Mozilla/5.0"})
+
+
+def fetch_greenhouse(company: dict, slug: str) -> list[dict]:
     url  = f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true"
-
-    log.info(f"  [Greenhouse] {company['name']} — {url}")
-    resp = requests.get(url, timeout=ATS_TIMEOUT_SECS, headers={"User-Agent": "Mozilla/5.0"})
+    log.info(f"  [Greenhouse] {company['name']} → {url}")
+    resp = _get(url)
     resp.raise_for_status()
-
     raw_jobs = resp.json().get("jobs", [])
-    log.info(f"  [Greenhouse] {company['name']} — {len(raw_jobs)} total listings found")
-
+    log.info(f"  [Greenhouse] {company['name']} — {len(raw_jobs)} listings")
     jobs = []
     for raw in raw_jobs:
-        title    = (raw.get("title") or "").strip()
-        location = (raw.get("location") or {}).get("name", "Remote")
-        job_url  = raw.get("absolute_url") or ""
-        job_id   = str(raw.get("id") or "")
-
-        # Extract description text from HTML content field
-        content_html = raw.get("content") or ""
-        description  = _strip_html(content_html)
-
+        title   = (raw.get("title") or "").strip()
+        job_url = raw.get("absolute_url") or ""
         if not title or not job_url:
             continue
-
         jobs.append(_build_job_dict(
             company     = company,
             title       = title,
-            location    = location,
+            location    = (raw.get("location") or {}).get("name", "Remote"),
             url         = job_url,
-            external_id = f"greenhouse_{slug}_{job_id}",
-            description = description,
+            external_id = f"greenhouse_{slug}_{raw.get('id', '')}",
+            description = _strip_html(raw.get("content") or ""),
         ))
-
     return jobs
 
 
-# ── Ashby API ────────────────────────────────────────────────────────────────
-
-@retry(
-    retry=retry_if_exception_type((requests.ConnectionError, requests.Timeout)),
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=2, min=3, max=20),
-    before_sleep=before_sleep_log(log, logging.WARNING),
-    reraise=True,
-)
-def fetch_ashby(company: dict) -> list[dict]:
-    """
-    Fetch job listings from the Ashby job board API.
-    Returns a list of normalized job dicts ready for the main pipeline.
-
-    API docs: https://developers.ashbyhq.com/docs/job-board-api
-    Verify slug: https://jobs.ashbyhq.com/{slug}
-    """
-    slug = company["ats_slug"]
+def fetch_ashby(company: dict, slug: str) -> list[dict]:
     url  = f"https://api.ashbyhq.com/posting-api/job-board/{slug}"
-
-    log.info(f"  [Ashby] {company['name']} — {url}")
-    resp = requests.get(url, timeout=ATS_TIMEOUT_SECS, headers={"User-Agent": "Mozilla/5.0"})
+    log.info(f"  [Ashby] {company['name']} → {url}")
+    resp = _get(url)
     resp.raise_for_status()
-
-    data     = resp.json()
-    raw_jobs = data.get("jobs", [])
-    log.info(f"  [Ashby] {company['name']} — {len(raw_jobs)} total listings found")
-
+    raw_jobs = resp.json().get("jobs", [])
+    log.info(f"  [Ashby] {company['name']} — {len(raw_jobs)} listings")
     jobs = []
     for raw in raw_jobs:
-        title    = (raw.get("title") or "").strip()
-        job_url  = raw.get("jobUrl") or raw.get("applyUrl") or ""
-        job_id   = str(raw.get("id") or "")
-        location = raw.get("location") or ("Remote" if raw.get("isRemote") else "Unknown")
-
-        content_html = raw.get("descriptionHtml") or raw.get("description") or ""
-        description  = _strip_html(content_html)
-
+        title   = (raw.get("title") or "").strip()
+        job_url = raw.get("jobUrl") or raw.get("applyUrl") or ""
         if not title or not job_url:
             continue
-
+        location = raw.get("location") or ("Remote" if raw.get("isRemote") else "Unknown")
         jobs.append(_build_job_dict(
             company     = company,
             title       = title,
             location    = str(location),
             url         = job_url,
-            external_id = f"ashby_{slug}_{job_id}",
-            description = description,
+            external_id = f"ashby_{slug}_{raw.get('id', '')}",
+            description = _strip_html(raw.get("descriptionHtml") or raw.get("description") or ""),
         ))
-
     return jobs
 
 
-# ── Lever API ─────────────────────────────────────────────────────────────────
-
-@retry(
-    retry=retry_if_exception_type((requests.ConnectionError, requests.Timeout)),
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=2, min=3, max=20),
-    before_sleep=before_sleep_log(log, logging.WARNING),
-    reraise=True,
-)
-def fetch_lever(company: dict) -> list[dict]:
-    """
-    Fetch job listings from the Lever postings API.
-    Returns a list of normalized job dicts ready for the main pipeline.
-
-    API docs: https://hire.lever.co/developer/postings
-    Verify slug: https://jobs.lever.co/{slug}
-    """
-    slug = company["ats_slug"]
+def fetch_lever(company: dict, slug: str) -> list[dict]:
     url  = f"https://api.lever.co/v0/postings/{slug}?mode=json"
-
-    log.info(f"  [Lever] {company['name']} — {url}")
-    resp = requests.get(url, timeout=ATS_TIMEOUT_SECS, headers={"User-Agent": "Mozilla/5.0"})
+    log.info(f"  [Lever] {company['name']} → {url}")
+    resp = _get(url)
     resp.raise_for_status()
-
     raw_jobs = resp.json()
     if not isinstance(raw_jobs, list):
         raw_jobs = []
-
-    log.info(f"  [Lever] {company['name']} — {len(raw_jobs)} total listings found")
-
+    log.info(f"  [Lever] {company['name']} — {len(raw_jobs)} listings")
     jobs = []
     for raw in raw_jobs:
-        title    = (raw.get("text") or "").strip()
-        job_url  = raw.get("hostedUrl") or ""
-        job_id   = raw.get("id") or ""
-
+        title   = (raw.get("text") or "").strip()
+        job_url = raw.get("hostedUrl") or ""
+        if not title or not job_url:
+            continue
         cats     = raw.get("categories") or {}
         location = cats.get("location") or cats.get("allLocations") or "Remote"
         if isinstance(location, list):
             location = ", ".join(location)
-
-        description = (
-            raw.get("descriptionPlain")
-            or _strip_html(raw.get("description") or "")
-        )
-
-        if not title or not job_url:
-            continue
-
         jobs.append(_build_job_dict(
             company     = company,
             title       = title,
             location    = str(location),
             url         = job_url,
-            external_id = f"lever_{slug}_{job_id}",
-            description = description,
+            external_id = f"lever_{slug}_{raw.get('id', '')}",
+            description = (raw.get("descriptionPlain") or _strip_html(raw.get("description") or "")),
         ))
-
     return jobs
+
+
+def probe_ats_apis(company: dict, slug: str) -> tuple[list[dict], str]:
+    """
+    Try Greenhouse → Ashby → Lever in order with the given slug.
+    Returns (jobs, ats_name_that_worked) or ([], "crawl4ai") if all fail.
+    """
+    name = company.get("name", "")
+    for ats_name, fetcher in [
+        ("greenhouse", fetch_greenhouse),
+        ("ashby",      fetch_ashby),
+        ("lever",      fetch_lever),
+    ]:
+        try:
+            jobs = fetcher(company, slug)
+            if jobs is not None:   # even an empty list means the API responded
+                log.info(f"  [{name}] Auto-detected ATS: {ats_name} (slug: {slug})")
+                return jobs, ats_name
+        except requests.HTTPError as e:
+            if e.response is not None and e.response.status_code == 404:
+                log.debug(f"  [{name}] {ats_name}/{slug} → 404, trying next")
+            else:
+                log.warning(f"  [{name}] {ats_name}/{slug} error: {e}")
+        except Exception as e:
+            log.debug(f"  [{name}] {ats_name}/{slug} failed: {e}")
+    log.info(f"  [{name}] No ATS API found — falling back to Crawl4AI")
+    return [], "crawl4ai"
+
+
+# ── Main entry point ──────────────────────────────────────────────────────────
+
+def run_career_page_scrape(companies: list[dict]) -> list[dict]:
+    selected = select_companies_for_run(companies)
+    if not selected:
+        log.info("No career pages selected for this run")
+        return []
+
+    ats_jobs       = []
+    crawl4ai_queue = []
+
+    for company in selected:
+        name = company.get("name", "Unknown")
+        ats_type, slug = detect_ats(company)
+
+        try:
+            if ats_type == "greenhouse":
+                jobs = fetch_greenhouse(company, slug)
+                log.info(f"  → {name}: {len(jobs)} jobs via Greenhouse")
+                ats_jobs.extend(jobs)
+
+            elif ats_type == "ashby":
+                jobs = fetch_ashby(company, slug)
+                log.info(f"  → {name}: {len(jobs)} jobs via Ashby")
+                ats_jobs.extend(jobs)
+
+            elif ats_type == "lever":
+                jobs = fetch_lever(company, slug)
+                log.info(f"  → {name}: {len(jobs)} jobs via Lever")
+                ats_jobs.extend(jobs)
+
+            elif ats_type == "probe":
+                jobs, found_ats = probe_ats_apis(company, slug)
+                if found_ats != "crawl4ai":
+                    log.info(f"  → {name}: {len(jobs)} jobs via {found_ats} (auto-detected)")
+                    ats_jobs.extend(jobs)
+                else:
+                    crawl4ai_queue.append(company)
+
+            else:
+                crawl4ai_queue.append(company)
+
+        except Exception as e:
+            log.error(f"  ATS fetch failed for {name} ({ats_type}/{slug}): {e} — falling back to Crawl4AI")
+            crawl4ai_queue.append(company)
+
+        time.sleep(random.uniform(MIN_DELAY_SECS, MAX_DELAY_SECS))
+
+    crawl4ai_results = []
+    if crawl4ai_queue:
+        log.info(f"[Crawl4AI] Running for {len(crawl4ai_queue)} companies ...")
+        crawl4ai_results = asyncio.run(_run_crawl4ai_batch(crawl4ai_queue))
+
+    log.info(
+        f"Career pages complete — "
+        f"{len(ats_jobs)} jobs via ATS APIs, "
+        f"{len(crawl4ai_queue)} companies via Crawl4AI"
+    )
+
+    wrapped_ats = [{"_ats_job": True, "_job_dict": job} for job in ats_jobs]
+    return wrapped_ats + crawl4ai_results
 
 
 # ── Crawl4AI fallback ─────────────────────────────────────────────────────────
 
 async def _fetch_crawl4ai(crawler, company: dict) -> dict | None:
-    """Fetch a single career page via Crawl4AI headless browser."""
     from crawl4ai import CrawlerRunConfig
-
     config = CrawlerRunConfig(
         page_timeout=PAGE_TIMEOUT * 1000,
         wait_for_images=False,
         exclude_external_links=True,
         verbose=False,
     )
-
     result = await crawler.arun(url=company["careers_url"], config=config)
-
     if not result.success:
-        raise RuntimeError(
-            f"Crawl4AI failure for {company['name']}: "
-            f"{getattr(result, 'error_message', 'unknown error')}"
-        )
-
+        raise RuntimeError(f"Crawl4AI failure for {company['name']}: {getattr(result, 'error_message', 'unknown')}")
     content = result.markdown or result.cleaned_html or ""
     if not content.strip():
         raise RuntimeError(f"Empty content for {company['name']}")
-
     if len(content) > MAX_CONTENT_CHARS:
         content = content[:MAX_CONTENT_CHARS] + "\n[content truncated]"
-
     return {
         "company":       company["name"],
         "careers_url":   company["careers_url"],
@@ -283,21 +330,17 @@ async def _fetch_crawl4ai(crawler, company: dict) -> dict | None:
 
 
 async def _run_crawl4ai_batch(companies: list[dict]) -> list[dict]:
-    """Run Crawl4AI for a list of companies. Returns page result dicts."""
     try:
         from crawl4ai import AsyncWebCrawler, BrowserConfig
     except ImportError:
         log.error("crawl4ai not installed — Crawl4AI fallback unavailable")
         return []
-
     results = []
-    browser_config = BrowserConfig(headless=True, verbose=False)
-
-    async with AsyncWebCrawler(config=browser_config) as crawler:
+    async with AsyncWebCrawler(config=BrowserConfig(headless=True, verbose=False)) as crawler:
         for i, company in enumerate(companies):
             name = company.get("name", "Unknown")
             try:
-                log.info(f"  [Crawl4AI] {company['name']}")
+                log.info(f"  [Crawl4AI] {name}")
                 page = await _fetch_crawl4ai(crawler, company)
                 if page:
                     results.append(page)
@@ -306,24 +349,18 @@ async def _run_crawl4ai_batch(companies: list[dict]) -> list[dict]:
                 log.error(f"    ✗ {name} failed: {e}")
             finally:
                 if i < len(companies) - 1:
-                    delay = random.uniform(MIN_DELAY_SECS, MAX_DELAY_SECS)
-                    await asyncio.sleep(delay)
-
+                    await asyncio.sleep(random.uniform(MIN_DELAY_SECS, MAX_DELAY_SECS))
     return results
 
 
 def extract_jobs_from_page(page_result: dict) -> list[dict]:
-    """
-    Given a Crawl4AI page result, ask Claude to identify job listings.
-    Only used for companies that fall back to Crawl4AI.
-    """
+    """LLM-based job extraction for Crawl4AI results."""
     from llm_extractor import _get_client, MAX_DESCRIPTION_CHARS, MODEL
-
     company     = page_result["company"]
     careers_url = page_result["careers_url"]
     raw_content = page_result["raw_content"]
 
-    listing_prompt = f"""You are parsing a company careers page to find remote marketing job listings.
+    prompt = f"""You are parsing a company careers page to find remote marketing job listings.
 
 Company: {company}
 Careers URL: {careers_url}
@@ -350,27 +387,17 @@ Return ONLY the JSON array, no other text.
 PAGE CONTENT:
 {raw_content[:MAX_DESCRIPTION_CHARS]}
 """
-
     client = _get_client()
     try:
-        message  = client.messages.create(
-            model=MODEL,
-            max_tokens=2048,
-            messages=[{"role": "user", "content": listing_prompt}],
-        )
+        message  = client.messages.create(model=MODEL, max_tokens=2048,
+                       messages=[{"role": "user", "content": prompt}])
         raw_text = message.content[0].text
-        log.debug(
-            f"Crawl4AI LLM scan — in: {message.usage.input_tokens}, "
-            f"out: {message.usage.output_tokens} | {company}"
-        )
     except Exception as e:
         log.error(f"LLM scan failed for {company}: {e}")
         return []
 
-    text = raw_text.strip()
-    text = re.sub(r"^```(?:json)?\s*", "", text)
+    text = re.sub(r"^```(?:json)?\s*", "", raw_text.strip())
     text = re.sub(r"\s*```$", "", text).strip()
-
     try:
         listings = json.loads(text)
         if not isinstance(listings, list):
@@ -384,7 +411,6 @@ PAGE CONTENT:
         return []
 
     log.info(f"Found {len(listings)} potential jobs on {company} Crawl4AI page")
-
     jobs = []
     for listing in listings:
         title = (listing.get("title") or "").strip()
@@ -393,7 +419,6 @@ PAGE CONTENT:
         url = (listing.get("url") or "").strip() or careers_url
         if any(j["url"] == url for j in jobs):
             continue
-
         jobs.append(_build_job_dict(
             company     = {"name": company, "careers_url": careers_url},
             title       = title,
@@ -402,95 +427,13 @@ PAGE CONTENT:
             external_id = None,
             description = listing.get("snippet", ""),
         ))
-
     return jobs
-
-
-# ── Main entry point ──────────────────────────────────────────────────────────
-
-def run_career_page_scrape(companies: list[dict]) -> list[dict]:
-    """
-    Scrape all selected companies using the best available method per company.
-    Returns a list of page_result dicts compatible with extract_jobs_from_page(),
-    PLUS inserts ATS-sourced jobs directly (they don't need the LLM page-scan step).
-
-    Returns (ats_jobs, crawl4ai_page_results) — caller handles each differently.
-    Actually returns a unified list for compatibility: ATS jobs are wrapped as
-    pre-extracted page results that skip the LLM listing scan.
-    """
-    selected = select_companies_for_run(companies)
-    if not selected:
-        log.info("No career pages selected for this run")
-        return []
-
-    ats_jobs        = []   # Jobs fetched directly via ATS API
-    crawl4ai_queue  = []   # Companies falling back to Crawl4AI
-
-    for company in selected:
-        ats  = (company.get("ats") or "crawl4ai").lower()
-        slug = company.get("ats_slug") or ""
-        name = company.get("name", "Unknown")
-
-        try:
-            if ats == "greenhouse" and slug:
-                jobs = fetch_greenhouse(company)
-                log.info(f"  → {name}: {len(jobs)} jobs via Greenhouse")
-                ats_jobs.extend(jobs)
-
-            elif ats == "ashby" and slug:
-                jobs = fetch_ashby(company)
-                log.info(f"  → {name}: {len(jobs)} jobs via Ashby")
-                ats_jobs.extend(jobs)
-
-            elif ats == "lever" and slug:
-                jobs = fetch_lever(company)
-                log.info(f"  → {name}: {len(jobs)} jobs via Lever")
-                ats_jobs.extend(jobs)
-
-            else:
-                if ats not in ("crawl4ai", ""):
-                    log.warning(f"  Unknown ATS type '{ats}' for {name} — falling back to Crawl4AI")
-                crawl4ai_queue.append(company)
-
-        except Exception as e:
-            log.error(f"  ATS fetch failed for {name} ({ats}/{slug}): {e} — falling back to Crawl4AI")
-            crawl4ai_queue.append(company)
-
-        # Polite delay between companies
-        time.sleep(random.uniform(MIN_DELAY_SECS, MAX_DELAY_SECS))
-
-    # Run Crawl4AI for any companies that need it
-    crawl4ai_results = []
-    if crawl4ai_queue:
-        log.info(f"[Crawl4AI] Running for {len(crawl4ai_queue)} companies ...")
-        crawl4ai_results = asyncio.run(_run_crawl4ai_batch(crawl4ai_queue))
-
-    log.info(
-        f"Career pages complete — "
-        f"{len(ats_jobs)} jobs via ATS APIs, "
-        f"{len(crawl4ai_queue)} companies via Crawl4AI"
-    )
-
-    # Return ATS jobs wrapped so main.py can handle them uniformly.
-    # ATS jobs are pre-extracted — they skip the LLM listing scan and go
-    # straight into _process_raw_job().
-    # Crawl4AI results still need extract_jobs_from_page() called on them.
-    # We encode the difference via a flag on the result dict.
-    wrapped_ats = [{"_ats_job": True, "_job_dict": job} for job in ats_jobs]
-    return wrapped_ats + crawl4ai_results
 
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
 
-def _build_job_dict(
-    company: dict,
-    title: str,
-    location: str,
-    url: str,
-    external_id: str | None,
-    description: str,
-) -> dict:
-    """Build a normalized job dict compatible with the main pipeline schema."""
+def _build_job_dict(company: dict, title: str, location: str, url: str,
+                    external_id: str | None, description: str) -> dict:
     return {
         "source":           "career_page",
         "external_id":      external_id,
@@ -499,7 +442,7 @@ def _build_job_dict(
         "title":            title,
         "company":          company["name"],
         "location":         location,
-        "employment_type":  None,    # LLM extraction fills this in
+        "employment_type":  None,
         "salary_min":       None,
         "salary_max":       None,
         "salary_raw":       None,
@@ -524,7 +467,6 @@ def _build_job_dict(
 
 
 def _strip_html(html: str) -> str:
-    """Remove HTML tags and collapse whitespace."""
     if not html:
         return ""
     text = re.sub(r"<[^>]+>", " ", html)

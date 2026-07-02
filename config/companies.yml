@@ -1,106 +1,78 @@
 # ============================================================
 # Remote Rocket — Target Company Career Pages
 # ============================================================
-# Add companies here to scrape their career pages directly.
-# These "hidden gem" jobs often appear here before job boards.
+# Add a company name and careers URL. The scraper auto-detects
+# the ATS (Greenhouse, Ashby, Lever) from the URL and fetches
+# jobs via API. If no API is found, it falls back to Crawl4AI.
 #
 # Fields:
 #   name          (required) Company display name
-#   careers_url   (required) Direct URL to the jobs/careers listing page
-#   ats           (optional) ATS type: "greenhouse", "lever", or "crawl4ai"
-#                            Defaults to "crawl4ai" if not set.
-#   ats_slug      (required for greenhouse/lever) The company slug used in the ATS API.
-#                   Greenhouse: verify at https://boards.greenhouse.io/{slug}/jobs
-#                   Lever:      verify at https://jobs.lever.co/{slug}
-#   high_priority (optional) true = scraped every run
-#                            false/omitted = scraped every other run
-#   notes         (optional) Reminder about the company or page quirks
+#   careers_url   (required) URL to the jobs/careers listing page
+#   high_priority (optional) true = scraped every run; false/omitted = every other run
+#   notes         (optional) Reminders or quirks
 # ============================================================
 
 companies:
 
-  # --- Agencies (highest volume of relevant remote PPC roles) ---
+  # --- Agencies ---
 
   - name: "Tinuiti"
     careers_url: "https://tinuiti.wd12.myworkdayjobs.com/Tinuiti"
-    ats: "crawl4ai"
     high_priority: true
-    notes: "Uses Workday — no public API. Crawl4AI fallback."
+    notes: "Workday — auto-detected, Crawl4AI fallback"
 
   - name: "Wpromote"
     careers_url: "https://www.wpromote.com/careers"
-    ats: "ashby"
-    ats_slug: "wpromote"
     high_priority: true
-    notes: "Uses Ashby embedded on their own domain."
 
   - name: "Logical Position"
     careers_url: "https://www.logicalposition.com/careers"
-    ats: "crawl4ai"
     high_priority: true
 
   - name: "PMG"
-    careers_url: "https://www.pmg.com/careers/"
-    ats: "greenhouse"
-    ats_slug: "pmg"
+    careers_url: "https://job-boards.greenhouse.io/pmg"
     high_priority: true
-    notes: "Data-driven performance agency."
 
   - name: "Jellyfish"
-    careers_url: "https://www.jellyfish.com/en-us/careers"
-    ats: "ashby"
-    ats_slug: "jellyfishcareers"
+    careers_url: "https://jobs.ashbyhq.com/jellyfishcareers"
     high_priority: true
 
   - name: "Directive Consulting"
     careers_url: "https://directiveconsulting.com/careers/"
-    ats: "greenhouse"
-    ats_slug: "directiveconsulting"
     high_priority: false
-    notes: "B2B performance marketing agency."
 
   - name: "NP Digital"
     careers_url: "https://npdigital.com/careers/"
-    ats: "crawl4ai"
     high_priority: false
 
   - name: "Seer Interactive"
-    careers_url: "https://www.seerinteractive.com/careers"
-    ats: "lever"
-    ats_slug: "seerinteractive"
+    careers_url: "https://jobs.lever.co/seerinteractive"
     high_priority: false
 
-  # --- SaaS / Tech (strong in-house marketing teams) ---
+  # --- SaaS / Tech ---
 
   - name: "HubSpot"
-    careers_url: "https://www.hubspot.com/careers/jobs"
-    ats: "greenhouse"
-    ats_slug: "hubspot"
+    careers_url: "https://boards.greenhouse.io/hubspot"
     high_priority: false
 
   - name: "Klaviyo"
-    careers_url: "https://www.klaviyo.com/careers"
-    ats: "greenhouse"
-    ats_slug: "klaviyo"
+    careers_url: "https://boards.greenhouse.io/klaviyo"
     high_priority: false
 
   - name: "Semrush"
     careers_url: "https://www.semrush.com/careers/"
-    ats: "greenhouse"
-    ats_slug: "semrush"
     high_priority: false
 
   - name: "Bazaarvoice"
     careers_url: "https://www.bazaarvoice.com/careers/"
-    ats: "crawl4ai"
     high_priority: false
 
   - name: "ClickUp"
     careers_url: "https://clickup.com/careers"
-    ats: "greenhouse"
-    ats_slug: "clickup"
     high_priority: false
 
-  # Add more companies below. No code changes needed.
-  # For Greenhouse: check https://boards.greenhouse.io/{slug}/jobs
-  # For Lever:      check https://jobs.lever.co/{slug}
+  # ── How to add a company ─────────────────────────────────
+  # 1. Find their careers page URL
+  # 2. If the URL contains greenhouse.io, ashbyhq.com, or lever.co → paste it directly
+  # 3. If it's on their own domain → paste it anyway; the scraper will probe APIs automatically
+  # 4. Set high_priority: true if they hire remote PPC roles frequently
