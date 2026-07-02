@@ -203,8 +203,9 @@ def render_job_card(job: dict, index: int) -> None:
                 desc = job.get("description_clean") or job.get("description_raw") or ""
                 if desc:
                     import re
-                    # Unescape markdown artifacts left by scrapers (e.g. \- \* \[ \])
                     cleaned = re.sub(r"\\([^\w\s])", r"\1", desc[:5000])
+                    # Ensure single newlines become paragraph breaks in markdown
+                    cleaned = re.sub(r"\n", "\n\n", cleaned)
                     if len(desc) > 5000:
                         cleaned += "\n\n…"
                     st.markdown(cleaned)
