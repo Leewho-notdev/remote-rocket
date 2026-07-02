@@ -129,6 +129,59 @@ def fetch_greenhouse(company: dict) -> list[dict]:
     return jobs
 
 
+# ── Ashby API ────────────────────────────────────────────────────────────────
+
+@retry(
+    retry=retry_if_exception_type((requests.ConnectionError, requests.Timeout)),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=2, min=3, max=20),
+    before_sleep=before_sleep_log(log, logging.WARNING),
+    reraise=True,
+)
+def fetch_ashby(company: dict) -> list[dict]:
+    """
+    Fetch job listings from the Ashby job board API.
+    Returns a list of normalized job dicts ready for the main pipeline.
+
+    API docs: https://developers.ashbyhq.com/docs/job-board-api
+    Verify slug: https://jobs.ashbyhq.com/{slug}
+    """
+    slug = company["ats_slug"]
+    url  = f"https://api.ashbyhq.com/posting-api/job-board/{slug}"
+
+    log.info(f"  [Ashby] {company['name']} — {url}")
+    resp = requests.get(url, timeout=ATS_TIMEOUT_SECS, headers={"User-Agent": "Mozilla/5.0"})
+    resp.raise_for_status()
+
+    data     = resp.json()
+    raw_jobs = data.get("jobs", [])
+    log.info(f"  [Ashby] {company['name']} — {len(raw_jobs)} total listings found")
+
+    jobs = []
+    for raw in raw_jobs:
+        title    = (raw.get("title") or "").strip()
+        job_url  = raw.get("jobUrl") or raw.get("applyUrl") or ""
+        job_id   = str(raw.get("id") or "")
+        location = raw.get("location") or ("Remote" if raw.get("isRemote") else "Unknown")
+
+        content_html = raw.get("descriptionHtml") or raw.get("description") or ""
+        description  = _strip_html(content_html)
+
+        if not title or not job_url:
+            continue
+
+        jobs.append(_build_job_dict(
+            company     = company,
+            title       = title,
+            location    = str(location),
+            url         = job_url,
+            external_id = f"ashby_{slug}_{job_id}",
+            description = description,
+        ))
+
+    return jobs
+
+
 # ── Lever API ─────────────────────────────────────────────────────────────────
 
 @retry(
@@ -382,6 +435,11 @@ def run_career_page_scrape(companies: list[dict]) -> list[dict]:
             if ats == "greenhouse" and slug:
                 jobs = fetch_greenhouse(company)
                 log.info(f"  → {name}: {len(jobs)} jobs via Greenhouse")
+                ats_jobs.extend(jobs)
+
+            elif ats == "ashby" and slug:
+                jobs = fetch_ashby(company)
+                log.info(f"  → {name}: {len(jobs)} jobs via Ashby")
                 ats_jobs.extend(jobs)
 
             elif ats == "lever" and slug:

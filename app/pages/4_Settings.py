@@ -214,7 +214,7 @@ with tab_co:
 
         st.write(f"**{len(companies)} companies total** — {len(high)} high priority, {len(std)} standard")
 
-        ATS_LABEL = {"greenhouse": "🌱 Greenhouse", "lever": "⚙️ Lever", "crawl4ai": "🕷 Crawl4AI"}
+        ATS_LABEL = {"greenhouse": "🌱 Greenhouse", "lever": "⚙️ Lever", "ashby": "🔷 Ashby", "crawl4ai": "🕷 Crawl4AI"}
 
         for section_label, group in [("High priority (scraped every run)", high), ("Standard (scraped every other run)", std)]:
             st.write(f"**{section_label}**")

@@ -22,18 +22,17 @@ companies:
   # --- Agencies (highest volume of relevant remote PPC roles) ---
 
   - name: "Tinuiti"
-    careers_url: "https://tinuiti.com/careers/"
-    ats: "greenhouse"
-    ats_slug: "tinuiti"
+    careers_url: "https://tinuiti.wd12.myworkdayjobs.com/Tinuiti"
+    ats: "crawl4ai"
     high_priority: true
-    notes: "Large performance agency. Strong remote culture."
+    notes: "Uses Workday — no public API. Crawl4AI fallback."
 
   - name: "Wpromote"
     careers_url: "https://www.wpromote.com/careers"
-    ats: "greenhouse"
+    ats: "ashby"
     ats_slug: "wpromote"
     high_priority: true
-    notes: "Performance-focused agency. Frequently hires remote paid search."
+    notes: "Uses Ashby embedded on their own domain."
 
   - name: "Logical Position"
     careers_url: "https://www.logicalposition.com/careers"
@@ -43,14 +42,14 @@ companies:
   - name: "PMG"
     careers_url: "https://www.pmg.com/careers/"
     ats: "greenhouse"
-    ats_slug: "pmgadvertising"
+    ats_slug: "pmg"
     high_priority: true
     notes: "Data-driven performance agency."
 
   - name: "Jellyfish"
     careers_url: "https://www.jellyfish.com/en-us/careers"
-    ats: "greenhouse"
-    ats_slug: "jellyfish"
+    ats: "ashby"
+    ats_slug: "jellyfishcareers"
     high_priority: true
 
   - name: "Directive Consulting"
