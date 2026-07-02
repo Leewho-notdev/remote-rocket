@@ -79,7 +79,9 @@ def _google_search(query: str, num_results: int = 20) -> list[str]:
     Returns a list of result URLs.
     """
     if SCRAPINGBEE_API_KEY:
-        # ScrapingBee scrapes a URL — pass the Google search URL directly
+        # ScrapingBee scrapes a URL — pass the Google search URL directly.
+        # We get back raw HTML and extract hrefs ourselves (extract_rules
+        # requires a paid plan feature; this works on all plans).
         google_url = (
             "https://www.google.com/search?q="
             + requests.utils.quote(query)
@@ -88,18 +90,16 @@ def _google_search(query: str, num_results: int = 20) -> list[str]:
         resp = requests.get(
             SCRAPINGBEE_URL,
             params={
-                "api_key":    SCRAPINGBEE_API_KEY,
-                "url":        google_url,
-                "render_js":  "true",
-                "extract_rules": '{"urls":{"selector":"a[href]","type":"list","output":"@href"}}',
+                "api_key":   SCRAPINGBEE_API_KEY,
+                "url":       google_url,
+                "render_js": "false",
             },
             timeout=60,
         )
         resp.raise_for_status()
-        data = resp.json()
-        raw_urls = data.get("urls", []) or []
-        # Keep only external result links — drop Google navigation and internal URLs
-        return [u for u in raw_urls if u.startswith("http") and "google.com" not in u]
+        # Parse all hrefs from the HTML and keep external result links
+        all_hrefs = re.findall(r'href=["\']([^"\']+)["\']', resp.text)
+        return [u for u in all_hrefs if u.startswith("http") and "google.com" not in u]
     else:
         try:
             from googlesearch import search as google_search
