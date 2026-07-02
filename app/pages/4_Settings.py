@@ -7,6 +7,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+import time
 import streamlit as st
 import yaml
 from datetime import datetime, timedelta, timezone
@@ -58,22 +59,37 @@ with col_info:
 
 st.divider()
 
+# ── Running state banner + auto-refresh ──────────────────────────────────────
+recent_check = get_recent_scrape_runs(limit=1)
+is_running = recent_check and recent_check[0].get("status") == "running"
+
+if is_running:
+    st.warning("⏳ Scrape in progress — page refreshes every 5 seconds...", icon="🔄")
+    time.sleep(5)
+    st.rerun()
+
 # ── Scraper status overview ───────────────────────────────────────────────────
 st.subheader("Scraper Status")
 
 last_run = get_last_successful_run()
 if last_run:
-    c1, c2, c3, c4, c5 = st.columns(5)
+    finished_raw = last_run.get("finished_at") or ""
+    try:
+        finished_dt  = datetime.fromisoformat(finished_raw)
+        finished_str = finished_dt.strftime("%-d %b %Y, %-I:%M %p UTC")
+    except (ValueError, TypeError):
+        finished_str = finished_raw[:16].replace("T", " ") or "—"
+
+    st.caption(f"Last successful run: **{finished_str}**")
+
+    c1, c2, c3, c4 = st.columns(4)
     with c1:
-        finished = (last_run.get("finished_at") or "")[:16].replace("T", " ")
-        st.metric("Last Successful Run", finished or "—")
+        st.metric("Jobs Fetched", last_run.get("jobs_fetched", 0))
     with c2:
-        st.metric("Fetched", last_run.get("jobs_fetched", 0))
-    with c3:
         st.metric("New Jobs", last_run.get("jobs_new", 0))
-    with c4:
+    with c3:
         st.metric("Scored", last_run.get("jobs_scored", 0))
-    with c5:
+    with c4:
         duration = last_run.get("duration_secs")
         st.metric("Duration", f"{duration}s" if duration else "—")
 else:
