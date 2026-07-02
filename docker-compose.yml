@@ -19,6 +19,7 @@ services:
     volumes:
       - ./app:/app             # Live reload: edits on host reflect instantly in container
       - ./db:/app/db           # Reads the same database as the scraper
+      - ./logs:/app/logs       # Read scraper logs for the Settings log viewer
       - ./config:/app/config   # Can read config for the Settings page
       - ./prompts:/app/prompts # Resume tailoring prompts (edit without rebuilding)
     depends_on:

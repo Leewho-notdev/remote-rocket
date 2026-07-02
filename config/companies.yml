@@ -7,6 +7,11 @@
 # Fields:
 #   name          (required) Company display name
 #   careers_url   (required) Direct URL to the jobs/careers listing page
+#   ats           (optional) ATS type: "greenhouse", "lever", or "crawl4ai"
+#                            Defaults to "crawl4ai" if not set.
+#   ats_slug      (required for greenhouse/lever) The company slug used in the ATS API.
+#                   Greenhouse: verify at https://boards.greenhouse.io/{slug}/jobs
+#                   Lever:      verify at https://jobs.lever.co/{slug}
 #   high_priority (optional) true = scraped every run
 #                            false/omitted = scraped every other run
 #   notes         (optional) Reminder about the company or page quirks
@@ -18,60 +23,85 @@ companies:
 
   - name: "Tinuiti"
     careers_url: "https://tinuiti.com/careers/"
+    ats: "greenhouse"
+    ats_slug: "tinuiti"
     high_priority: true
     notes: "Large performance agency. Strong remote culture."
 
   - name: "Wpromote"
     careers_url: "https://www.wpromote.com/careers"
+    ats: "greenhouse"
+    ats_slug: "wpromote"
     high_priority: true
     notes: "Performance-focused agency. Frequently hires remote paid search."
 
   - name: "Logical Position"
     careers_url: "https://www.logicalposition.com/careers"
+    ats: "crawl4ai"
     high_priority: true
 
   - name: "PMG"
     careers_url: "https://www.pmg.com/careers/"
+    ats: "greenhouse"
+    ats_slug: "pmgadvertising"
     high_priority: true
     notes: "Data-driven performance agency."
 
   - name: "Jellyfish"
     careers_url: "https://www.jellyfish.com/en-us/careers"
+    ats: "greenhouse"
+    ats_slug: "jellyfish"
     high_priority: true
 
   - name: "Directive Consulting"
     careers_url: "https://directiveconsulting.com/careers/"
+    ats: "greenhouse"
+    ats_slug: "directiveconsulting"
     high_priority: false
     notes: "B2B performance marketing agency."
 
   - name: "NP Digital"
     careers_url: "https://npdigital.com/careers/"
+    ats: "crawl4ai"
     high_priority: false
 
   - name: "Seer Interactive"
     careers_url: "https://www.seerinteractive.com/careers"
+    ats: "lever"
+    ats_slug: "seerinteractive"
     high_priority: false
 
   # --- SaaS / Tech (strong in-house marketing teams) ---
 
   - name: "HubSpot"
     careers_url: "https://www.hubspot.com/careers/jobs"
+    ats: "greenhouse"
+    ats_slug: "hubspot"
     high_priority: false
 
   - name: "Klaviyo"
     careers_url: "https://www.klaviyo.com/careers"
+    ats: "greenhouse"
+    ats_slug: "klaviyo"
     high_priority: false
 
   - name: "Semrush"
     careers_url: "https://www.semrush.com/careers/"
+    ats: "greenhouse"
+    ats_slug: "semrush"
     high_priority: false
 
   - name: "Bazaarvoice"
     careers_url: "https://www.bazaarvoice.com/careers/"
+    ats: "crawl4ai"
     high_priority: false
 
   - name: "ClickUp"
     careers_url: "https://clickup.com/careers"
+    ats: "greenhouse"
+    ats_slug: "clickup"
     high_priority: false
 
   # Add more companies below. No code changes needed.
+  # For Greenhouse: check https://boards.greenhouse.io/{slug}/jobs
+  # For Lever:      check https://jobs.lever.co/{slug}

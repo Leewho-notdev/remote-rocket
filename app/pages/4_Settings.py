@@ -185,7 +185,7 @@ if not os.path.exists(kw_path):
 if not os.path.exists(co_path):
     co_path = os.path.join(os.path.dirname(__file__), "..", "..", "config", "companies.yml")
 
-tab_kw, tab_co, tab_env = st.tabs(["Keywords", "Companies", "Environment"])
+tab_kw, tab_co, tab_env, tab_log = st.tabs(["Keywords", "Companies", "Environment", "Scraper Log"])
 
 with tab_kw:
     if os.path.exists(kw_path):
@@ -214,13 +214,16 @@ with tab_co:
 
         st.write(f"**{len(companies)} companies total** — {len(high)} high priority, {len(std)} standard")
 
-        st.write("**High priority** (scraped every run)")
-        for c in high:
-            st.markdown(f"- [{c['name']}]({c.get('careers_url', '')})")
+        ATS_LABEL = {"greenhouse": "🌱 Greenhouse", "lever": "⚙️ Lever", "crawl4ai": "🕷 Crawl4AI"}
 
-        st.write("**Standard** (scraped every other run)")
-        for c in std:
-            st.markdown(f"- [{c['name']}]({c.get('careers_url', '')})")
+        for section_label, group in [("High priority (scraped every run)", high), ("Standard (scraped every other run)", std)]:
+            st.write(f"**{section_label}**")
+            for c in group:
+                ats  = (c.get("ats") or "crawl4ai").lower()
+                slug = c.get("ats_slug") or ""
+                ats_badge = ATS_LABEL.get(ats, ats)
+                slug_str  = f" `{slug}`" if slug else ""
+                st.markdown(f"- [{c['name']}]({c.get('careers_url', '')}) — {ats_badge}{slug_str}")
     else:
         st.warning(f"companies.yml not found at {co_path}")
 
@@ -240,3 +243,59 @@ with tab_env:
             st.code(k)
         with c2:
             st.write(v)
+
+with tab_log:
+    LOG_PATH = os.getenv("LOG_PATH", "/app/logs/scraper.log")
+
+    log_col1, log_col2 = st.columns([3, 1])
+    with log_col1:
+        st.write(f"Reading from `{LOG_PATH}`")
+    with log_col2:
+        log_lines = st.selectbox("Lines to show", [100, 250, 500, 1000], index=0, label_visibility="collapsed")
+
+    if not os.path.exists(LOG_PATH):
+        st.warning(
+            f"Log file not found at `{LOG_PATH}`. "
+            "This is normal if no scrape has run yet, or if the logs volume "
+            "isn't mounted to the app container. Check docker-compose.yml.",
+            icon="⚠️",
+        )
+    else:
+        try:
+            with open(LOG_PATH, "r") as f:
+                all_lines = f.readlines()
+
+            tail = all_lines[-log_lines:]
+            log_text = "".join(tail)
+
+            # Colour-coded summary strip — scan for key markers
+            errors   = sum(1 for l in tail if "[ERROR]" in l)
+            warnings = sum(1 for l in tail if "[WARNING]" in l)
+            new_jobs = sum(1 for l in tail if "New job #" in l)
+            scored   = sum(1 for l in tail if "Scored #" in l)
+            ats_hits = sum(1 for l in tail if ("Greenhouse" in l or "Lever" in l) and "jobs via" in l)
+
+            s1, s2, s3, s4 = st.columns(4)
+            s1.metric("New jobs logged", new_jobs)
+            s2.metric("Scored", scored)
+            s3.metric("Warnings", warnings)
+            s4.metric("Errors", errors)
+
+            if errors:
+                st.error(f"{errors} error(s) found — scan the log below for [ERROR] lines.", icon="❌")
+
+            st.text_area(
+                label="",
+                value=log_text,
+                height=500,
+                disabled=True,
+                label_visibility="collapsed",
+            )
+
+            st.caption(
+                f"Showing last {len(tail)} of {len(all_lines)} total lines. "
+                f"Full log at `{LOG_PATH}` on the server."
+            )
+
+        except Exception as e:
+            st.error(f"Could not read log file: {e}")

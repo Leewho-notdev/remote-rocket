@@ -1,26 +1,25 @@
 """
 scraper/career_page_scraper.py
-Crawls company career pages to find "hidden gem" job listings.
+Fetches "hidden gem" jobs directly from company ATS (Applicant Tracking System) APIs
+and company career pages.
 
-Uses Crawl4AI (AsyncWebCrawler) to render JavaScript-heavy pages and return
-clean markdown that Claude can process efficiently.
+Priority order per company:
+  1. Greenhouse API  — clean JSON, no browser, 100% reliable
+  2. Lever API       — clean JSON, no browser, 100% reliable
+  3. Crawl4AI        — headless browser fallback for companies without a known ATS
 
-Guardrails:
-- 3–6 second random delay between requests (polite crawling)
-- Exponential backoff, max 3 attempts per company (via tenacity)
-- Per-company error isolation — one failure never stops the rest
-- high_priority companies are always scraped; others rotate every other run
-
-The raw markdown is returned to main.py, which passes it to llm_extractor.py
-to pull out individual job listings.
+Configure each company's ATS type and slug in config/companies.yml.
 """
 
 import asyncio
+import json
 import logging
 import os
 import random
-import sqlite3
+import re
+import time
 
+import requests
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -31,32 +30,30 @@ from tenacity import (
 
 log = logging.getLogger("remote-rocket.career-pages")
 
-# Polite delay range between page requests (seconds)
-MIN_DELAY_SECS = 3
-MAX_DELAY_SECS = 6
+# Polite delay between requests (seconds)
+MIN_DELAY_SECS = 2
+MAX_DELAY_SECS = 4
 
-# Crawl4AI page timeout (seconds)
+# Crawl4AI page timeout (seconds) — only used for crawl4ai fallback
 PAGE_TIMEOUT = 30
 
-# Max content length to pass to the LLM (career pages can be very long)
+# Max content length passed to LLM for crawl4ai fallback
 MAX_CONTENT_CHARS = 12_000
 
+# HTTP request timeout for ATS API calls
+ATS_TIMEOUT_SECS = 15
 
-# ── Rotation state ────────────────────────────────────────────────────────────
-# Tracks which run number we're on so standard-priority companies are scraped
-# every other run without requiring a persistent state file.
-# This is reset each container restart, which is acceptable for a personal tool.
+# Rotation counter for standard-priority companies
 _run_counter = 0
 
+
+# ── Company selection ─────────────────────────────────────────────────────────
 
 def select_companies_for_run(companies: list[dict]) -> list[dict]:
     """
     Decide which companies to scrape this run.
-    - high_priority=true  → always included
-    - high_priority=false → included on even-numbered runs only
-
-    This halves the load from standard companies while still covering them
-    every ~24 hours on a 12-hour scrape interval.
+    high_priority=true → always included
+    high_priority=false → included on even-numbered runs only
     """
     global _run_counter
     _run_counter += 1
@@ -68,7 +65,6 @@ def select_companies_for_run(companies: list[dict]) -> list[dict]:
         if company.get("high_priority", False):
             selected.append(company)
         elif _run_counter % 2 == 0:
-            # Even run — include standard-priority companies
             selected.append(company)
         else:
             skipped += 1
@@ -80,156 +76,200 @@ def select_companies_for_run(companies: list[dict]) -> list[dict]:
     return selected
 
 
-# ── Retry decorator ───────────────────────────────────────────────────────────
+# ── Greenhouse API ────────────────────────────────────────────────────────────
 
-def _make_retry():
-    """Build a tenacity retry decorator for page fetches."""
-    return retry(
-        retry=retry_if_exception_type(Exception),
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=2, min=4, max=30),
-        before_sleep=before_sleep_log(log, logging.WARNING),
-        reraise=True,
-    )
-
-
-# ── Core scraper ──────────────────────────────────────────────────────────────
-
-async def _fetch_single_page(crawler, company: dict) -> dict | None:
+@retry(
+    retry=retry_if_exception_type((requests.ConnectionError, requests.Timeout)),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=2, min=3, max=20),
+    before_sleep=before_sleep_log(log, logging.WARNING),
+    reraise=True,
+)
+def fetch_greenhouse(company: dict) -> list[dict]:
     """
-    Fetch one career page and return a result dict.
-    Decorated with retry at the call site.
-    Returns None on unrecoverable failure.
+    Fetch job listings from the Greenhouse boards API.
+    Returns a list of normalized job dicts ready for the main pipeline.
+
+    API docs: https://developers.greenhouse.io/job-board.html
+    Verify slug: https://boards.greenhouse.io/{slug}/jobs
     """
-    # Import here to avoid loading Playwright at module import time
-    # (keeps startup fast when Crawl4AI isn't needed yet)
+    slug = company["ats_slug"]
+    url  = f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true"
+
+    log.info(f"  [Greenhouse] {company['name']} — {url}")
+    resp = requests.get(url, timeout=ATS_TIMEOUT_SECS, headers={"User-Agent": "Mozilla/5.0"})
+    resp.raise_for_status()
+
+    raw_jobs = resp.json().get("jobs", [])
+    log.info(f"  [Greenhouse] {company['name']} — {len(raw_jobs)} total listings found")
+
+    jobs = []
+    for raw in raw_jobs:
+        title    = (raw.get("title") or "").strip()
+        location = (raw.get("location") or {}).get("name", "Remote")
+        job_url  = raw.get("absolute_url") or ""
+        job_id   = str(raw.get("id") or "")
+
+        # Extract description text from HTML content field
+        content_html = raw.get("content") or ""
+        description  = _strip_html(content_html)
+
+        if not title or not job_url:
+            continue
+
+        jobs.append(_build_job_dict(
+            company     = company,
+            title       = title,
+            location    = location,
+            url         = job_url,
+            external_id = f"greenhouse_{slug}_{job_id}",
+            description = description,
+        ))
+
+    return jobs
+
+
+# ── Lever API ─────────────────────────────────────────────────────────────────
+
+@retry(
+    retry=retry_if_exception_type((requests.ConnectionError, requests.Timeout)),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=2, min=3, max=20),
+    before_sleep=before_sleep_log(log, logging.WARNING),
+    reraise=True,
+)
+def fetch_lever(company: dict) -> list[dict]:
+    """
+    Fetch job listings from the Lever postings API.
+    Returns a list of normalized job dicts ready for the main pipeline.
+
+    API docs: https://hire.lever.co/developer/postings
+    Verify slug: https://jobs.lever.co/{slug}
+    """
+    slug = company["ats_slug"]
+    url  = f"https://api.lever.co/v0/postings/{slug}?mode=json"
+
+    log.info(f"  [Lever] {company['name']} — {url}")
+    resp = requests.get(url, timeout=ATS_TIMEOUT_SECS, headers={"User-Agent": "Mozilla/5.0"})
+    resp.raise_for_status()
+
+    raw_jobs = resp.json()
+    if not isinstance(raw_jobs, list):
+        raw_jobs = []
+
+    log.info(f"  [Lever] {company['name']} — {len(raw_jobs)} total listings found")
+
+    jobs = []
+    for raw in raw_jobs:
+        title    = (raw.get("text") or "").strip()
+        job_url  = raw.get("hostedUrl") or ""
+        job_id   = raw.get("id") or ""
+
+        cats     = raw.get("categories") or {}
+        location = cats.get("location") or cats.get("allLocations") or "Remote"
+        if isinstance(location, list):
+            location = ", ".join(location)
+
+        description = (
+            raw.get("descriptionPlain")
+            or _strip_html(raw.get("description") or "")
+        )
+
+        if not title or not job_url:
+            continue
+
+        jobs.append(_build_job_dict(
+            company     = company,
+            title       = title,
+            location    = str(location),
+            url         = job_url,
+            external_id = f"lever_{slug}_{job_id}",
+            description = description,
+        ))
+
+    return jobs
+
+
+# ── Crawl4AI fallback ─────────────────────────────────────────────────────────
+
+async def _fetch_crawl4ai(crawler, company: dict) -> dict | None:
+    """Fetch a single career page via Crawl4AI headless browser."""
     from crawl4ai import CrawlerRunConfig
 
     config = CrawlerRunConfig(
-        page_timeout=PAGE_TIMEOUT * 1000,   # Crawl4AI uses milliseconds
-        wait_for_images=False,              # We only need text
+        page_timeout=PAGE_TIMEOUT * 1000,
+        wait_for_images=False,
         exclude_external_links=True,
         verbose=False,
     )
 
-    result = await crawler.arun(
-        url=company["careers_url"],
-        config=config,
-    )
+    result = await crawler.arun(url=company["careers_url"], config=config)
 
     if not result.success:
         raise RuntimeError(
-            f"Crawl4AI returned failure for {company['name']}: "
+            f"Crawl4AI failure for {company['name']}: "
             f"{getattr(result, 'error_message', 'unknown error')}"
         )
 
     content = result.markdown or result.cleaned_html or ""
     if not content.strip():
-        raise RuntimeError(f"Empty content returned for {company['name']}")
+        raise RuntimeError(f"Empty content for {company['name']}")
 
-    # Trim to keep LLM token cost predictable
     if len(content) > MAX_CONTENT_CHARS:
         content = content[:MAX_CONTENT_CHARS] + "\n[content truncated]"
 
     return {
-        "company":        company["name"],
-        "careers_url":    company["careers_url"],
-        "source":         "career_page",
-        "source_url":     company["careers_url"],
-        "is_hidden_gem":  1,
-        "raw_content":    content,
-        "high_priority":  company.get("high_priority", False),
+        "company":       company["name"],
+        "careers_url":   company["careers_url"],
+        "source":        "career_page",
+        "source_url":    company["careers_url"],
+        "is_hidden_gem": 1,
+        "raw_content":   content,
+        "high_priority": company.get("high_priority", False),
     }
 
 
-async def scrape_career_pages(companies: list[dict]) -> list[dict]:
-    """
-    Fetch all selected career pages sequentially with polite delays.
-    Returns a list of result dicts for pages that succeeded.
-
-    Sequential (not concurrent) to avoid hammering servers and to respect
-    the per-request delay. Career pages are a supplemental source — speed
-    matters less than reliability and politeness.
-    """
+async def _run_crawl4ai_batch(companies: list[dict]) -> list[dict]:
+    """Run Crawl4AI for a list of companies. Returns page result dicts."""
     try:
         from crawl4ai import AsyncWebCrawler, BrowserConfig
     except ImportError:
-        log.error("crawl4ai is not installed. Career page scraping will be skipped.")
+        log.error("crawl4ai not installed — Crawl4AI fallback unavailable")
         return []
 
     results = []
-    retry_fetch = _make_retry()
-
-    browser_config = BrowserConfig(
-        headless=True,
-        verbose=False,
-    )
+    browser_config = BrowserConfig(headless=True, verbose=False)
 
     async with AsyncWebCrawler(config=browser_config) as crawler:
         for i, company in enumerate(companies):
             name = company.get("name", "Unknown")
-
             try:
-                log.info(f"Career page [{i + 1}/{len(companies)}]: {name}")
-
-                # Apply retry decorator dynamically
-                fetch_with_retry = retry_fetch(_fetch_single_page)
-                page_result = await fetch_with_retry(crawler, company)
-
-                if page_result:
-                    results.append(page_result)
-                    log.info(
-                        f"  ✓ {name} — {len(page_result['raw_content'])} chars"
-                    )
-
+                log.info(f"  [Crawl4AI] {company['name']}")
+                page = await _fetch_crawl4ai(crawler, company)
+                if page:
+                    results.append(page)
+                    log.info(f"    ✓ {name} — {len(page['raw_content'])} chars")
             except Exception as e:
-                # Per-company isolation: log and continue, never raise
-                log.error(f"  ✗ {name} failed after all retries: {e}")
-
+                log.error(f"    ✗ {name} failed: {e}")
             finally:
-                # Polite delay after every request (success or failure),
-                # except after the last company
                 if i < len(companies) - 1:
                     delay = random.uniform(MIN_DELAY_SECS, MAX_DELAY_SECS)
-                    log.debug(f"  Waiting {delay:.1f}s before next request …")
                     await asyncio.sleep(delay)
 
-    log.info(f"Career pages complete: {len(results)}/{len(companies)} succeeded")
     return results
 
 
-def run_career_page_scrape(companies: list[dict]) -> list[dict]:
-    """
-    Synchronous entry point for career page scraping.
-    Selects companies based on priority/rotation, then runs the async scraper.
-    Called from main.py's synchronous run_scrape() function.
-    """
-    selected = select_companies_for_run(companies)
-    if not selected:
-        log.info("No career pages selected for this run")
-        return []
-
-    return asyncio.run(scrape_career_pages(selected))
-
-
-# ── Job extraction from career page content ───────────────────────────────────
-
 def extract_jobs_from_page(page_result: dict) -> list[dict]:
     """
-    Given a crawled career page result, ask Claude to identify and extract
-    individual job listings from the markdown content.
-
-    Returns a list of job dicts (may be empty if no relevant jobs found).
-    This function uses a different prompt strategy than extract_job_data():
-    it first finds job listings on the page, then processes each one.
+    Given a Crawl4AI page result, ask Claude to identify job listings.
+    Only used for companies that fall back to Crawl4AI.
     """
-    from llm_extractor import _get_client, _parse_response, MAX_DESCRIPTION_CHARS, MODEL
+    from llm_extractor import _get_client, MAX_DESCRIPTION_CHARS, MODEL
 
-    company      = page_result["company"]
-    careers_url  = page_result["careers_url"]
-    raw_content  = page_result["raw_content"]
+    company     = page_result["company"]
+    careers_url = page_result["careers_url"]
+    raw_content = page_result["raw_content"]
 
-    # Step 1: Ask Claude to identify job listings on the page
     listing_prompt = f"""You are parsing a company careers page to find remote marketing job listings.
 
 Company: {company}
@@ -259,25 +299,21 @@ PAGE CONTENT:
 """
 
     client = _get_client()
-
     try:
-        message = client.messages.create(
+        message  = client.messages.create(
             model=MODEL,
             max_tokens=2048,
             messages=[{"role": "user", "content": listing_prompt}],
         )
         raw_text = message.content[0].text
         log.debug(
-            f"Career page listing scan — in: {message.usage.input_tokens}, "
-            f"out: {message.usage.output_tokens} tokens | {company}"
+            f"Crawl4AI LLM scan — in: {message.usage.input_tokens}, "
+            f"out: {message.usage.output_tokens} | {company}"
         )
-
     except Exception as e:
-        log.error(f"Failed to scan career page for {company}: {e}")
+        log.error(f"LLM scan failed for {company}: {e}")
         return []
 
-    # Parse the listings array
-    import re, json
     text = raw_text.strip()
     text = re.sub(r"^```(?:json)?\s*", "", text)
     text = re.sub(r"\s*```$", "", text).strip()
@@ -285,63 +321,154 @@ PAGE CONTENT:
     try:
         listings = json.loads(text)
         if not isinstance(listings, list):
-            log.warning(f"Unexpected response format for {company} career page")
             return []
     except json.JSONDecodeError:
-        log.error(f"Could not parse job listings JSON for {company}")
-        log.debug(f"Raw: {raw_text[:300]}")
+        log.error(f"Could not parse listings JSON for {company}")
         return []
 
     if not listings:
         log.info(f"No relevant jobs found on {company} career page")
         return []
 
-    log.info(f"Found {len(listings)} potential jobs on {company} career page")
+    log.info(f"Found {len(listings)} potential jobs on {company} Crawl4AI page")
 
-    # Step 2: Convert each listing to a job dict for the main pipeline
-    # The main pipeline will run full extraction via extract_job_data()
     jobs = []
     for listing in listings:
-        title = listing.get("title", "").strip()
+        title = (listing.get("title") or "").strip()
         if not title:
             continue
-
-        # Build a URL: use the listing URL if found, otherwise the careers page URL
-        url = listing.get("url", "").strip() or careers_url
-
-        # Deduplicate within this page (same URL appearing twice)
+        url = (listing.get("url") or "").strip() or careers_url
         if any(j["url"] == url for j in jobs):
             continue
 
-        jobs.append({
-            "source":           "career_page",
-            "external_id":      None,
-            "url":              url,
-            "source_url":       careers_url,
-            "title":            title,
-            "company":          company,
-            "location":         listing.get("location", "Remote"),
-            "employment_type":  None,   # LLM extraction will fill this in
-            "salary_min":       None,
-            "salary_max":       None,
-            "salary_raw":       None,
-            "salary_currency":  "USD",
-            "description_raw":  listing.get("snippet", ""),
-            "description_clean": listing.get("snippet", ""),
-            "requirements":     None,
-            "skills_detected":  None,
-            "raw_llm_response": None,
-            "relevance_score":  None,
-            "salary_score":     None,
-            "is_fully_remote":  1,
-            "is_hidden_gem":    1,
-            "has_google_ads":   0,
-            "has_msft_ads":     0,
-            "has_gtm":          0,
-            "has_gmc":          0,
-            "is_excluded":      0,
-            "exclusion_reason": None,
-            "date_posted":      None,
-        })
+        jobs.append(_build_job_dict(
+            company     = {"name": company, "careers_url": careers_url},
+            title       = title,
+            location    = listing.get("location", "Remote"),
+            url         = url,
+            external_id = None,
+            description = listing.get("snippet", ""),
+        ))
 
     return jobs
+
+
+# ── Main entry point ──────────────────────────────────────────────────────────
+
+def run_career_page_scrape(companies: list[dict]) -> list[dict]:
+    """
+    Scrape all selected companies using the best available method per company.
+    Returns a list of page_result dicts compatible with extract_jobs_from_page(),
+    PLUS inserts ATS-sourced jobs directly (they don't need the LLM page-scan step).
+
+    Returns (ats_jobs, crawl4ai_page_results) — caller handles each differently.
+    Actually returns a unified list for compatibility: ATS jobs are wrapped as
+    pre-extracted page results that skip the LLM listing scan.
+    """
+    selected = select_companies_for_run(companies)
+    if not selected:
+        log.info("No career pages selected for this run")
+        return []
+
+    ats_jobs        = []   # Jobs fetched directly via ATS API
+    crawl4ai_queue  = []   # Companies falling back to Crawl4AI
+
+    for company in selected:
+        ats  = (company.get("ats") or "crawl4ai").lower()
+        slug = company.get("ats_slug") or ""
+        name = company.get("name", "Unknown")
+
+        try:
+            if ats == "greenhouse" and slug:
+                jobs = fetch_greenhouse(company)
+                log.info(f"  → {name}: {len(jobs)} jobs via Greenhouse")
+                ats_jobs.extend(jobs)
+
+            elif ats == "lever" and slug:
+                jobs = fetch_lever(company)
+                log.info(f"  → {name}: {len(jobs)} jobs via Lever")
+                ats_jobs.extend(jobs)
+
+            else:
+                if ats not in ("crawl4ai", ""):
+                    log.warning(f"  Unknown ATS type '{ats}' for {name} — falling back to Crawl4AI")
+                crawl4ai_queue.append(company)
+
+        except Exception as e:
+            log.error(f"  ATS fetch failed for {name} ({ats}/{slug}): {e} — falling back to Crawl4AI")
+            crawl4ai_queue.append(company)
+
+        # Polite delay between companies
+        time.sleep(random.uniform(MIN_DELAY_SECS, MAX_DELAY_SECS))
+
+    # Run Crawl4AI for any companies that need it
+    crawl4ai_results = []
+    if crawl4ai_queue:
+        log.info(f"[Crawl4AI] Running for {len(crawl4ai_queue)} companies ...")
+        crawl4ai_results = asyncio.run(_run_crawl4ai_batch(crawl4ai_queue))
+
+    log.info(
+        f"Career pages complete — "
+        f"{len(ats_jobs)} jobs via ATS APIs, "
+        f"{len(crawl4ai_queue)} companies via Crawl4AI"
+    )
+
+    # Return ATS jobs wrapped so main.py can handle them uniformly.
+    # ATS jobs are pre-extracted — they skip the LLM listing scan and go
+    # straight into _process_raw_job().
+    # Crawl4AI results still need extract_jobs_from_page() called on them.
+    # We encode the difference via a flag on the result dict.
+    wrapped_ats = [{"_ats_job": True, "_job_dict": job} for job in ats_jobs]
+    return wrapped_ats + crawl4ai_results
+
+
+# ── Shared helpers ────────────────────────────────────────────────────────────
+
+def _build_job_dict(
+    company: dict,
+    title: str,
+    location: str,
+    url: str,
+    external_id: str | None,
+    description: str,
+) -> dict:
+    """Build a normalized job dict compatible with the main pipeline schema."""
+    return {
+        "source":           "career_page",
+        "external_id":      external_id,
+        "url":              url,
+        "source_url":       company.get("careers_url", url),
+        "title":            title,
+        "company":          company["name"],
+        "location":         location,
+        "employment_type":  None,    # LLM extraction fills this in
+        "salary_min":       None,
+        "salary_max":       None,
+        "salary_raw":       None,
+        "salary_currency":  "USD",
+        "description_raw":  description,
+        "description_clean": description,
+        "requirements":     None,
+        "skills_detected":  None,
+        "raw_llm_response": None,
+        "relevance_score":  None,
+        "salary_score":     None,
+        "is_fully_remote":  1,
+        "is_hidden_gem":    1,
+        "has_google_ads":   0,
+        "has_msft_ads":     0,
+        "has_gtm":          0,
+        "has_gmc":          0,
+        "is_excluded":      0,
+        "exclusion_reason": None,
+        "date_posted":      None,
+    }
+
+
+def _strip_html(html: str) -> str:
+    """Remove HTML tags and collapse whitespace."""
+    if not html:
+        return ""
+    text = re.sub(r"<[^>]+>", " ", html)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text[:MAX_CONTENT_CHARS]

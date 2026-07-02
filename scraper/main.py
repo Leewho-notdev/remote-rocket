@@ -113,10 +113,17 @@ def run_scrape() -> dict:
 
         for page_result in page_results:
             try:
-                career_jobs = extract_jobs_from_page(page_result)
-                stats["jobs_fetched"] += len(career_jobs)
-                for job in career_jobs:
+                # ATS API jobs are pre-extracted — go straight into the pipeline
+                if page_result.get("_ats_job"):
+                    job = page_result["_job_dict"]
+                    stats["jobs_fetched"] += 1
                     _process_raw_job(conn, job, title_exclusions, stats, new_job_ids)
+                else:
+                    # Crawl4AI results need the LLM listing-scan step
+                    career_jobs = extract_jobs_from_page(page_result)
+                    stats["jobs_fetched"] += len(career_jobs)
+                    for job in career_jobs:
+                        _process_raw_job(conn, job, title_exclusions, stats, new_job_ids)
             except Exception as e:
                 company = page_result.get("company", "?")
                 _log_error(stats, f"[Career Pages] Failed to process {company}: {e}")
