@@ -20,7 +20,7 @@ def render_filters() -> dict:
 
     Returns a dict with keys matching db.get_jobs() parameters:
         min_salary, employment_types, sources, days_posted,
-        min_score, keywords, has_google_ads, has_msft_ads,
+        min_score, keywords, negative_keywords, has_google_ads, has_msft_ads,
         has_gtm, has_gmc, include_excluded, include_inactive, sort_by
     """
     st.sidebar.header("🔍 Filters")
@@ -96,6 +96,15 @@ def render_filters() -> dict:
         placeholder="e.g. 'performance' or 'Klaviyo'",
     )
 
+    # ── Negative keywords ─────────────────────────────────────────────────────
+    st.sidebar.subheader("Negative Keywords")
+    negative_keywords_raw = st.sidebar.text_input(
+        "Exclude title or company containing",
+        placeholder="e.g. meta, tiktok, snapchat",
+        help="Comma-separated. Hides any job where the title or company name contains any of these terms.",
+    )
+    negative_keywords = [kw.strip() for kw in negative_keywords_raw.split(",") if kw.strip()]
+
     # ── Relevance score ───────────────────────────────────────────────────────
     st.sidebar.subheader("Relevance Score")
     min_score = st.sidebar.slider(
@@ -143,7 +152,8 @@ def render_filters() -> dict:
         "has_msft_ads":     has_msft_ads,
         "has_gtm":          has_gtm,
         "has_gmc":          has_gmc,
-        "include_excluded": include_excluded,
-        "include_inactive": include_inactive,
-        "sort_by":          sort_by,
+        "include_excluded":   include_excluded,
+        "include_inactive":   include_inactive,
+        "sort_by":            sort_by,
+        "negative_keywords":  negative_keywords,
     }

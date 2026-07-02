@@ -48,6 +48,7 @@ jobs = get_jobs(
     days_posted      = filters["days_posted"],
     min_score        = filters["min_score"],
     keywords         = filters["keywords"],
+    negative_keywords = filters["negative_keywords"],
     has_google_ads   = filters["has_google_ads"],
     has_msft_ads     = filters["has_msft_ads"],
     has_gtm          = filters["has_gtm"],

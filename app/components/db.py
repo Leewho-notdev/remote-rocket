@@ -37,6 +37,7 @@ def get_jobs(
     days_posted: int        = None,    # None = no date filter
     min_score: int          = 0,
     keywords: str           = "",      # searched in title + company
+    negative_keywords: list = None,   # excluded from title + company
     has_google_ads: bool    = False,
     has_msft_ads: bool      = False,
     has_gtm: bool           = False,
@@ -94,6 +95,13 @@ def get_jobs(
         conditions.append("(j.title LIKE ? OR j.company LIKE ?)")
         kw = f"%{keywords.strip()}%"
         params.extend([kw, kw])
+
+    # Negative keywords — exclude jobs where title or company matches any term
+    if negative_keywords:
+        for nkw in negative_keywords:
+            conditions.append("(j.title NOT LIKE ? AND j.company NOT LIKE ?)")
+            val = f"%{nkw}%"
+            params.extend([val, val])
 
     # Skill flags
     if has_google_ads:
