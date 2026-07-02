@@ -6,8 +6,48 @@ Designed to be called in a loop from the Browse Jobs page.
 All rendering logic lives here so the page file stays clean.
 """
 
+import re
+import html
 import streamlit as st
 from components.db import upsert_application, delete_job
+
+# Section header patterns common in job descriptions
+_SECTION_HEADERS = re.compile(
+    r"(?<=[.!?])\s+(?="
+    r"(?:About|Overview|The Role|What You(?:'ll| Will)|Who You Are|"
+    r"Responsibilities|What We(?:'re| Are) Looking|Key Responsibilities|"
+    r"Requirements|Qualifications|Minimum Qualifications|Preferred|"
+    r"Benefits|Compensation|Salary|Location|Your Location|"
+    r"What We Offer|Why Join|Our Commitment|Equal Opportunity|"
+    r"About the Team|About Us|About the Company|The Team|"
+    r"How You(?:'ll| Will)|What You(?:'ll| Will) Do|"
+    r"Skills|Experience|Education)"
+    r")"
+)
+
+
+def _format_description(text: str) -> str:
+    """
+    Convert plain-text job description to readable HTML.
+    Preserves existing newlines and injects paragraph breaks before
+    common section headers that run together in scraped text.
+    """
+    # Strip escape sequences and markdown bold/italic
+    text = re.sub(r"\\([^\w\s])", r"\1", text)
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    text = re.sub(r"\*(.+?)\*", r"\1", text)
+
+    # Inject double newline before section headers that follow a sentence end
+    text = _SECTION_HEADERS.sub("\n\n", text)
+
+    # Escape HTML then convert newlines to HTML breaks/paragraphs
+    text = html.escape(text)
+    # Double newline → paragraph break
+    text = re.sub(r"\n{2,}", "</p><p>", text)
+    # Single newline → line break
+    text = text.replace("\n", "<br>")
+
+    return f"<p>{text}</p>"
 
 
 # Colour-coded relevance score indicator
@@ -202,18 +242,13 @@ def render_job_card(job: dict, index: int) -> None:
                 st.subheader("Description")
                 desc = job.get("description_clean") or job.get("description_raw") or ""
                 if desc:
-                    import re, html
-                    cleaned = re.sub(r"\\([^\w\s])", r"\1", desc[:5000])
-                    cleaned = re.sub(r"\*\*(.+?)\*\*", r"\1", cleaned)
-                    cleaned = re.sub(r"\*(.+?)\*", r"\1", cleaned)
-                    if len(desc) > 5000:
-                        cleaned += "\n…"
-                    escaped = html.escape(cleaned).replace("\n", "<br>")
+                    truncated = desc[:5000] + ("\n…" if len(desc) > 5000 else "")
+                    formatted = _format_description(truncated)
                     st.markdown(
                         f'<div style="max-height:350px;overflow-y:auto;'
                         f'padding:12px 16px;border-radius:6px;'
                         f'border:1px solid rgba(128,128,128,0.3);'
-                        f'font-size:1.1rem;line-height:1.7">{escaped}</div>',
+                        f'font-size:1.1rem;line-height:1.7">{formatted}</div>',
                         unsafe_allow_html=True,
                     )
                 else:
