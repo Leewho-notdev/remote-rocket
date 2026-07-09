@@ -54,7 +54,7 @@ def render_filters() -> dict:
     # ── Source ────────────────────────────────────────────────────────────────
     st.sidebar.subheader("Source")
     col_jp, col_cp = st.sidebar.columns(2)
-    show_jobspy     = col_jp.toggle("Job boards",     value=True)
+    show_jobspy     = col_jp.toggle("Job boards",     value=False)
     show_careerpages = col_cp.toggle("💎 Career pages", value=True)
     sources = (
         (["jobspy"] if show_jobspy else [])

@@ -35,7 +35,10 @@ if not db_exists():
     st.stop()
 
 # ── Page header ───────────────────────────────────────────────────────────────
-st.title("📋 Browse Jobs")
+selected_sources = filters["sources"] or ["career_page"]
+both_on = "career_page" in selected_sources and "jobspy" in selected_sources
+page_title = "📋 Hidden Gems & Job Boards" if both_on else ("💎 Hidden Gems" if "career_page" in selected_sources else "📌 Job Boards")
+st.title(page_title)
 
 # Shared filter kwargs (everything except source)
 base_filters = dict(
@@ -55,7 +58,6 @@ base_filters = dict(
     sort_by           = filters["sort_by"],
 )
 
-selected_sources = filters["sources"] or ["jobspy", "career_page"]
 gems       = get_jobs(sources=["career_page"], limit=200, **base_filters) if "career_page" in selected_sources else []
 board_jobs = get_jobs(sources=["jobspy"],       limit=200, **base_filters) if "jobspy"       in selected_sources else []
 total_showing = len(gems) + len(board_jobs)
