@@ -242,6 +242,7 @@ div[role="alert"] {{
 .stApp [data-testid="stMainBlockContainer"] {{
     padding-top: 3rem;
 }}
+
 </style>
 """
 

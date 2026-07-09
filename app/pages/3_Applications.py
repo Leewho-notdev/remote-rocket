@@ -210,139 +210,135 @@ def render_kanban_card(app: dict, col_key: str, tailored_ids: set,
         # ── Follow-up email ───────────────────────────────────────────────────
         FOLLOWUP_STAGES = {"applied", "phone_screen", "interview"}
         if app.get("status") in FOLLOWUP_STAGES:
-            st.markdown("---")
-            draft_key  = f"followup_draft_{app_id}"
-            email_key  = f"followup_email_{app_id}"
+            with st.container(border=True):
+                draft_key  = f"followup_draft_{app_id}"
+                email_key  = f"followup_email_{app_id}"
 
-            fu_count   = (followup_counts or {}).get(job_id, 0)
-            btn_label  = (
-                f"📧 Draft follow-up #{fu_count + 1}"
-                if fu_count > 0 else "📧 Draft follow-up email"
-            )
-            if fu_count > 0:
-                st.caption(f"📬 {fu_count} follow-up{'s' if fu_count != 1 else ''} sent")
-
-            if st.button(btn_label, key=f"draft_btn_{key}", use_container_width=True):
-                with st.spinner("Finding contact email…"):
-                    saved_email = (app.get("contact_email") or "").strip()
-                    if saved_email:
-                        result = {"email": saved_email, "name": app.get("contact_name"),
-                                  "status": "verified", "source": "Saved contact"}
-                    else:
-                        result = find_verified_email(app, app.get("contact_name") or "")
-
-                st.session_state[email_key] = result
-
-                # Gather sender name + summary from master resume.
-                sender_name = ""
-                resume_summary = ""
-                master = get_master_resume()
-                if master and master.get("structured_json"):
-                    try:
-                        sj = json.loads(master["structured_json"])
-                        sender_name    = sj.get("name") or ""
-                        resume_summary = sj.get("summary") or ""
-                    except Exception:
-                        pass
-
-                history = get_followups(job_id)
-
-                with st.spinner("Drafting email…"):
-                    try:
-                        body = draft_followup_email(
-                            job                = app,
-                            sender_name        = sender_name,
-                            contact_name       = app.get("contact_name") or "",
-                            applied_date       = (app.get("applied_date") or "")[:10],
-                            resume_summary     = resume_summary,
-                            previous_followups = history,
-                        )
-                        st.session_state[draft_key] = body
-                        # Store history length so we know what number this is.
-                        st.session_state[f"followup_histlen_{app_id}"] = len(history)
-                        st.rerun()
-                    except Exception as e:
-                        st.error(str(e))
-
-            # Show results if a draft exists in session state.
-            email_result = st.session_state.get(email_key)
-            draft_body   = st.session_state.get(draft_key)
-
-            if email_result:
-                verified_email = email_result.get("email")
-                estatus = email_result.get("status")
-                if verified_email and estatus == "verified":
-                    st.caption(f"✅ Contact: {verified_email} ({email_result['source']})")
-                elif not verified_email:
-                    st.caption(f"⚠️ {email_result['source']}")
-                if verified_email and not (app.get("contact_email") or "").strip():
-                    if st.button("Save to contact", key=f"save_found_{key}"):
-                        update_application_field(app_id, "contact_email", verified_email)
-                        if email_result.get("name") and not (app.get("contact_name") or "").strip():
-                            update_application_field(app_id, "contact_name", email_result["name"])
-                        st.toast("Contact saved.")
-                        st.rerun()
-
-            if draft_body is not None:
-                import html as _html
-                safe = _html.escape(draft_body)
-                edited = st.components.v1.html(
-                    f"""
-                    <style>
-                      body {{margin:0;background:#1a1200;padding:10px;
-                             border-left:3px solid #ff6b35;border-radius:4px;}}
-                      textarea {{
-                        width:100%;box-sizing:border-box;height:200px;
-                        background:#241900;color:#fafafa;border:1px solid #5a3a00;
-                        border-radius:4px;padding:10px;font-size:0.85rem;
-                        font-family:sans-serif;resize:vertical;
-                      }}
-                      button {{
-                        margin-top:6px;width:100%;padding:7px;
-                        background:#2e2000;color:#ffb347;border:1px solid #5a3a00;
-                        border-radius:4px;cursor:pointer;font-size:0.8rem;
-                      }}
-                    </style>
-                    <textarea id="em">{safe}</textarea>
-                    <button onclick="
-                      var t=document.getElementById('em');
-                      t.select();
-                      document.execCommand('copy');
-                      this.innerText='✅ Copied!';
-                      setTimeout(()=>this.innerText='📋 Copy email',1500);">
-                      📋 Copy email
-                    </button>
-                    """,
-                    height=270,
+                fu_count   = (followup_counts or {}).get(job_id, 0)
+                btn_label  = (
+                    f"📧 Draft follow-up #{fu_count + 1}"
+                    if fu_count > 0 else "📧 Draft follow-up email"
                 )
-                # mailto link.
-                to_addr = (email_result or {}).get("email") or ""
-                subject = followup_subject(app)
-                import urllib.parse
-                mailto_href = (
-                    f"mailto:{urllib.parse.quote(to_addr)}"
-                    f"?subject={urllib.parse.quote(subject)}"
-                )
-                st.markdown(
-                    f'<a href="{mailto_href}" target="_blank" '
-                    f'style="display:block;text-align:center;padding:8px 0;'
-                    f'font-size:0.85rem;color:#ff6b35;">📨 Open in email client</a>',
-                    unsafe_allow_html=True,
-                )
-                histlen = st.session_state.get(f"followup_histlen_{app_id}", fu_count)
-                if st.button("✅ Mark as sent", key=f"mark_sent_{key}",
-                             use_container_width=True):
-                    save_followup(
-                        job_id        = job_id,
-                        followup_num  = histlen + 1,
-                        draft_text    = draft_body,
-                        contact_email = (email_result or {}).get("email") or "",
+                if fu_count > 0:
+                    st.caption(f"📬 {fu_count} follow-up{'s' if fu_count != 1 else ''} sent")
+
+                if st.button(btn_label, key=f"draft_btn_{key}", use_container_width=True):
+                    with st.spinner("Finding contact email…"):
+                        saved_email = (app.get("contact_email") or "").strip()
+                        if saved_email:
+                            result = {"email": saved_email, "name": app.get("contact_name"),
+                                      "status": "verified", "source": "Saved contact"}
+                        else:
+                            result = find_verified_email(app, app.get("contact_name") or "")
+
+                    st.session_state[email_key] = result
+
+                    sender_name = ""
+                    resume_summary = ""
+                    master = get_master_resume()
+                    if master and master.get("structured_json"):
+                        try:
+                            sj = json.loads(master["structured_json"])
+                            sender_name    = sj.get("name") or ""
+                            resume_summary = sj.get("summary") or ""
+                        except Exception:
+                            pass
+
+                    history = get_followups(job_id)
+
+                    with st.spinner("Drafting email…"):
+                        try:
+                            body = draft_followup_email(
+                                job                = app,
+                                sender_name        = sender_name,
+                                contact_name       = app.get("contact_name") or "",
+                                applied_date       = (app.get("applied_date") or "")[:10],
+                                resume_summary     = resume_summary,
+                                previous_followups = history,
+                            )
+                            st.session_state[draft_key] = body
+                            st.session_state[f"followup_histlen_{app_id}"] = len(history)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(str(e))
+
+                # Show results if a draft exists in session state.
+                email_result = st.session_state.get(email_key)
+                draft_body   = st.session_state.get(draft_key)
+
+                if email_result:
+                    verified_email = email_result.get("email")
+                    estatus = email_result.get("status")
+                    if verified_email and estatus == "verified":
+                        st.caption(f"✅ Contact: {verified_email} ({email_result['source']})")
+                    elif not verified_email:
+                        st.caption(f"⚠️ {email_result['source']}")
+                    if verified_email and not (app.get("contact_email") or "").strip():
+                        if st.button("Save to contact", key=f"save_found_{key}"):
+                            update_application_field(app_id, "contact_email", verified_email)
+                            if email_result.get("name") and not (app.get("contact_name") or "").strip():
+                                update_application_field(app_id, "contact_name", email_result["name"])
+                            st.toast("Contact saved.")
+                            st.rerun()
+
+                if draft_body is not None:
+                    import html as _html
+                    safe = _html.escape(draft_body)
+                    st.components.v1.html(
+                        f"""
+                        <style>
+                          body {{margin:0;background:#1a1200;padding:10px;}}
+                          textarea {{
+                            width:100%;box-sizing:border-box;height:200px;
+                            background:#241900;color:#fafafa;border:1px solid #5a3a00;
+                            border-radius:4px;padding:10px;font-size:0.85rem;
+                            font-family:sans-serif;resize:vertical;
+                          }}
+                          button {{
+                            margin-top:6px;width:100%;padding:7px;
+                            background:#2e2000;color:#ffb347;border:1px solid #5a3a00;
+                            border-radius:4px;cursor:pointer;font-size:0.8rem;
+                          }}
+                        </style>
+                        <textarea id="em">{safe}</textarea>
+                        <button onclick="
+                          var t=document.getElementById('em');
+                          t.select();
+                          document.execCommand('copy');
+                          this.innerText='✅ Copied!';
+                          setTimeout(()=>this.innerText='📋 Copy email',1500);">
+                          📋 Copy email
+                        </button>
+                        """,
+                        height=270,
                     )
-                    del st.session_state[draft_key]
-                    if email_key in st.session_state:
-                        del st.session_state[email_key]
-                    st.toast("Follow-up logged.")
-                    st.rerun()
+                    to_addr = (email_result or {}).get("email") or ""
+                    subject = followup_subject(app)
+                    import urllib.parse
+                    mailto_href = (
+                        f"mailto:{urllib.parse.quote(to_addr)}"
+                        f"?subject={urllib.parse.quote(subject)}"
+                    )
+                    st.markdown(
+                        f'<a href="{mailto_href}" target="_blank" '
+                        f'style="display:block;text-align:center;padding:8px 0;'
+                        f'font-size:0.85rem;color:#ff6b35;">📨 Open in email client</a>',
+                        unsafe_allow_html=True,
+                    )
+                    histlen = st.session_state.get(f"followup_histlen_{app_id}", fu_count)
+                    if st.button("✅ Mark as sent", key=f"mark_sent_{key}",
+                                 use_container_width=True):
+                        save_followup(
+                            job_id        = job_id,
+                            followup_num  = histlen + 1,
+                            draft_text    = draft_body,
+                            contact_email = (email_result or {}).get("email") or "",
+                        )
+                        del st.session_state[draft_key]
+                        if email_key in st.session_state:
+                            del st.session_state[email_key]
+                        st.toast("Follow-up logged.")
+                        st.rerun()
 
 
 # ── Tabs layout ───────────────────────────────────────────────────────────────
