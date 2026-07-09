@@ -68,6 +68,8 @@ _CSS = f"""
 [data-testid="stSidebar"] {{
     background: {SURFACE};
     border-right: 1px solid {BORDER};
+    min-width: 200px !important;
+    max-width: 220px !important;
 }}
 [data-testid="stSidebarNav"] {{
     padding-top: 0.5rem;
@@ -248,8 +250,6 @@ div[role="alert"] {{
 /* Trim Streamlit's default top padding for a tighter header */
 .stApp [data-testid="stMainBlockContainer"] {{
     padding-top: 3rem;
-    padding-left: 3rem;
-    padding-right: 3rem;
 }}
 
 </style>

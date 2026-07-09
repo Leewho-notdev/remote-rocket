@@ -24,7 +24,7 @@ from components.theme import apply_theme
 st.set_page_config(
     page_title="Applications — Remote Rocket",
     page_icon="🚀",
-    layout="centered",
+    layout="wide",
 )
 apply_theme()
 st.title("📁 Applications Pipeline")
