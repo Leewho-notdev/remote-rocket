@@ -146,7 +146,7 @@ def render_filters() -> dict:
         "Minimum score (1–10)",
         min_value=1,
         max_value=10,
-        value=1,
+        value=7,
         help="Relevance scores are assigned by Claude in Step 5. "
              "All jobs score 0 until extraction runs.",
     )
