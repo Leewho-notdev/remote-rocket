@@ -68,9 +68,9 @@ st.divider()
 # ── Hidden Gems section ───────────────────────────────────────────────────────
 if "career_page" in selected_sources:
     st.markdown("## 💎 Hidden Gems")
-    st.caption(
-        "Jobs sourced directly from company career pages — "
-        "not posted on LinkedIn or Indeed. These are the unique finds."
+    st.markdown(
+        "**Jobs sourced directly from company career pages. "
+        "Not posted on LinkedIn or Indeed. These are the unique finds.**"
     )
     if gems:
         for i, job in enumerate(gems):
