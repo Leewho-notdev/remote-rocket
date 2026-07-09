@@ -79,10 +79,18 @@ tailored_ids  = jobs_with_tailoring()
 all_job_ids   = [a["job_id"] for a in get_applications()]
 followup_counts = followup_count_by_job(all_job_ids)
 
-metric_cols = st.columns(len(ALL_STATUSES))
-for col, (status_key, label) in zip(metric_cols, ALL_STATUSES):
+# Only show active pipeline in metrics — closed stages live in the tab.
+METRIC_LABELS = {
+    "saved":        "Saved",
+    "applied":      "Applied",
+    "phone_screen": "Phone Screen",
+    "interview":    "Interview",
+    "offer":        "Offer",
+}
+metric_cols = st.columns(len(ACTIVE_PIPELINE))
+for col, (status_key, _) in zip(metric_cols, ACTIVE_PIPELINE):
     with col:
-        st.metric(label, len(grouped[status_key]))
+        st.metric(METRIC_LABELS[status_key], len(grouped[status_key]))
 
 st.divider()
 
