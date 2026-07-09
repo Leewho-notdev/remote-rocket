@@ -247,11 +247,14 @@ div[role="alert"] {{
 .stApp a {{ color: {ORANGE}; }}
 .stApp a:hover {{ color: {ORANGE_HI}; }}
 
-/* Trim Streamlit's default top padding for a tighter header */
+/* Trim Streamlit's default top padding; constrain width on wide layout */
 .stApp [data-testid="stMainBlockContainer"] {{
     padding-top: 3rem;
     padding-left: 2rem !important;
     padding-right: 2rem !important;
+    max-width: 960px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
 }}
 
 </style>
