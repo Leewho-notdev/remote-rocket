@@ -248,8 +248,8 @@ div[role="alert"] {{
 /* Trim Streamlit's default top padding for a tighter header */
 .stApp [data-testid="stMainBlockContainer"] {{
     padding-top: 3rem;
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
+    padding-left: 3rem;
+    padding-right: 3rem;
 }}
 
 </style>
