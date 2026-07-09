@@ -145,6 +145,9 @@ _CSS = f"""
     letter-spacing: 0.08em;
     font-size: 0.72rem;
     color: {MUTED};
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
 }}
 [data-testid="stMetricValue"] {{
     font-family: 'Space Grotesk', sans-serif;
@@ -245,6 +248,8 @@ div[role="alert"] {{
 /* Trim Streamlit's default top padding for a tighter header */
 .stApp [data-testid="stMainBlockContainer"] {{
     padding-top: 3rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
 }}
 
 </style>
