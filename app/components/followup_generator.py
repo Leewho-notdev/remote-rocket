@@ -226,7 +226,10 @@ def draft_followup_email(job: dict, sender_name: str, contact_name: str = "",
             system     = system,
             messages   = [{"role": "user", "content": prompt}],
         )
-        return msg.content[0].text.strip()
+        text = msg.content[0].text.strip()
+        # Hard strip any dashes that slipped through — em, en, figure, hyphen-minus.
+        text = re.sub(r"—|–|‒|‐", ", ", text)  # em/en/figure/hyphen → comma
+        return text
     except Exception as e:
         log.error(f"Follow-up draft failed: {e}")
         raise RuntimeError(f"Could not draft email: {e}")
