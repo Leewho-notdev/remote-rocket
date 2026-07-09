@@ -68,8 +68,6 @@ _CSS = f"""
 [data-testid="stSidebar"] {{
     background: {SURFACE};
     border-right: 1px solid {BORDER};
-    min-width: 200px !important;
-    max-width: 220px !important;
 }}
 [data-testid="stSidebarNav"] {{
     padding-top: 0.5rem;
@@ -247,14 +245,14 @@ div[role="alert"] {{
 .stApp a {{ color: {ORANGE}; }}
 .stApp a:hover {{ color: {ORANGE_HI}; }}
 
-/* Trim Streamlit's default top padding; constrain width on wide layout */
+/* Trim Streamlit's default top padding; add breathing room on all screen sizes */
 .stApp [data-testid="stMainBlockContainer"] {{
     padding-top: 3rem;
-    padding-left: 2rem !important;
-    padding-right: 2rem !important;
-    max-width: 960px !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
 }}
 
 </style>
