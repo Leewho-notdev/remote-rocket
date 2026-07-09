@@ -41,30 +41,25 @@ def render_filters() -> dict:
 
     # ── Employment type ───────────────────────────────────────────────────────
     st.sidebar.subheader("Employment Type")
-    type_options = {
-        "Full-time":      "full_time",
-        "Contract":       "contract",
-        "Part-time":      "part_time",
-    }
-    selected_types = st.sidebar.multiselect(
-        "Show roles of type",
-        options=list(type_options.keys()),
-        default=["Full-time", "Contract"],
-    )
-    employment_types = [type_options[t] for t in selected_types] or None
+    col_ft, col_ct, col_pt = st.sidebar.columns(3)
+    show_fulltime = col_ft.toggle("Full-time", value=True)
+    show_contract = col_ct.toggle("Contract",  value=True)
+    show_parttime = col_pt.toggle("Part-time", value=False)
+    employment_types = (
+        (["full_time"] if show_fulltime else [])
+        + (["contract"] if show_contract else [])
+        + (["part_time"] if show_parttime else [])
+    ) or None
 
     # ── Source ────────────────────────────────────────────────────────────────
     st.sidebar.subheader("Source")
-    source_options = {
-        "Job boards (LinkedIn, Indeed…)": "jobspy",
-        "💎 Company career pages":         "career_page",
-    }
-    selected_sources = st.sidebar.multiselect(
-        "Show jobs from",
-        options=list(source_options.keys()),
-        default=list(source_options.keys()),
-    )
-    sources = [source_options[s] for s in selected_sources] or None
+    col_jp, col_cp = st.sidebar.columns(2)
+    show_jobspy     = col_jp.toggle("Job boards",     value=True)
+    show_careerpages = col_cp.toggle("💎 Career pages", value=True)
+    sources = (
+        (["jobspy"] if show_jobspy else [])
+        + (["career_page"] if show_careerpages else [])
+    ) or None
 
     # ── Date posted ───────────────────────────────────────────────────────────
     st.sidebar.subheader("Date Posted")

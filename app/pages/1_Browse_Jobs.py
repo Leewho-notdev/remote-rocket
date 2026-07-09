@@ -1,15 +1,12 @@
 """
 pages/1_Browse_Jobs.py
 The main job board — filters in the sidebar, job cards in the main panel.
-
-Filter state persists within a session via Streamlit's widget state.
-Each filter change triggers a fresh database query (fast with SQLite + indexes).
+Hidden Gem career page jobs are surfaced in a dedicated section at the top.
 """
 
 import sys
 import os
 
-# Ensure the app/ directory is on the path so components can be imported
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import streamlit as st
@@ -40,60 +37,65 @@ if not db_exists():
 # ── Page header ───────────────────────────────────────────────────────────────
 st.title("📋 Browse Jobs")
 
-# ── Fetch jobs from DB using current filter state ─────────────────────────────
-jobs = get_jobs(
-    min_salary       = filters["min_salary"],
-    employment_types = filters["employment_types"],
-    sources          = filters["sources"],
-    days_posted      = filters["days_posted"],
-    min_score        = filters["min_score"],
-    keywords         = filters["keywords"],
+counts = get_job_counts()
+total_active = counts.get("active", 0)
+
+# Shared filter kwargs (everything except source)
+base_filters = dict(
+    min_salary        = filters["min_salary"],
+    employment_types  = filters["employment_types"],
+    days_posted       = filters["days_posted"],
+    min_score         = filters["min_score"],
+    keywords          = filters["keywords"],
     negative_keywords = filters["negative_keywords"],
-    has_google_ads   = filters["has_google_ads"],
-    has_msft_ads     = filters["has_msft_ads"],
-    has_gtm          = filters["has_gtm"],
-    has_gmc          = filters["has_gmc"],
-    include_actioned = filters["include_actioned"],
-    include_excluded = filters["include_excluded"],
-    include_inactive = filters["include_inactive"],
-    sort_by          = filters["sort_by"],
-    limit            = 200,
+    has_google_ads    = filters["has_google_ads"],
+    has_msft_ads      = filters["has_msft_ads"],
+    has_gtm           = filters["has_gtm"],
+    has_gmc           = filters["has_gmc"],
+    include_actioned  = filters["include_actioned"],
+    include_excluded  = filters["include_excluded"],
+    include_inactive  = filters["include_inactive"],
+    sort_by           = filters["sort_by"],
 )
 
-# ── Result count + sort label ─────────────────────────────────────────────────
-counts = get_job_counts()
+selected_sources = filters["sources"] or ["jobspy", "career_page"]
 
-header_col, sort_col = st.columns([3, 1])
-with header_col:
-    total_active = counts.get("active", 0)
-    showing      = len(jobs)
+# ── Hidden Gems section ───────────────────────────────────────────────────────
+if "career_page" in selected_sources:
+    gems = get_jobs(sources=["career_page"], limit=200, **base_filters)
+
+    st.markdown("## 💎 Hidden Gems")
     st.caption(
-        f"Showing **{showing}** jobs"
-        + (f" (of {total_active} total active)" if showing < total_active else "")
+        "Jobs sourced directly from company career pages — "
+        "not posted on LinkedIn or Indeed. These are the unique finds."
     )
-with sort_col:
-    st.caption(f"Sorted by: **{filters['sort_by'].replace('_', ' ').title()}**")
 
-st.divider()
+    if gems:
+        st.caption(f"Showing **{len(gems)}** career page jobs")
+        for i, job in enumerate(gems):
+            render_job_card(job, index=i)
+    else:
+        st.info("No career page jobs match your current filters.", icon="💎")
 
-# ── Empty state ───────────────────────────────────────────────────────────────
-if not jobs:
-    st.info(
-        "No jobs match your current filters.\n\n"
-        "Try broadening the salary range, selecting more employment types, "
-        "or extending the date range. If the database is empty, wait for the "
-        "first scrape to complete (check the Settings page for status).",
-        icon="🔍",
-    )
-    st.stop()
+    st.divider()
 
-# ── Job cards ─────────────────────────────────────────────────────────────────
-for i, job in enumerate(jobs):
-    render_job_card(job, index=i)
+# ── Job boards section ────────────────────────────────────────────────────────
+if "jobspy" in selected_sources:
+    board_jobs = get_jobs(sources=["jobspy"], limit=200, **base_filters)
+
+    st.markdown("## 📌 Job Boards")
+    st.caption("Jobs from LinkedIn, Indeed, and other job boards.")
+
+    if board_jobs:
+        st.caption(f"Showing **{len(board_jobs)}** job board listings")
+        for i, job in enumerate(board_jobs):
+            render_job_card(job, index=i)
+    else:
+        st.info("No job board listings match your current filters.", icon="📌")
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.divider()
 st.caption(
-    f"Showing {showing} of {total_active} active jobs. "
+    f"{total_active} total active jobs in database. "
     "Adjust filters or go to **Settings** to trigger a new scrape."
 )
