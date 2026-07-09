@@ -11,6 +11,9 @@ import time
 import streamlit as st
 import yaml
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
+PT = ZoneInfo("America/Los_Angeles")
 from components.db import (
     get_recent_scrape_runs,
     get_last_successful_run,
@@ -43,10 +46,10 @@ with col_info:
     last_ok = get_last_successful_run()
     if last_ok and last_ok.get("finished_at"):
         try:
-            last_dt  = datetime.fromisoformat(last_ok["finished_at"])
+            last_dt  = datetime.fromisoformat(last_ok["finished_at"]).replace(tzinfo=timezone.utc).astimezone(PT)
             next_dt  = last_dt + timedelta(hours=SCRAPE_INTERVAL_HOURS)
-            now_utc  = datetime.now(timezone.utc).replace(tzinfo=None)
-            mins_left = int((next_dt - now_utc).total_seconds() / 60)
+            now_pt   = datetime.now(PT)
+            mins_left = int((next_dt - now_pt).total_seconds() / 60)
             if mins_left > 0:
                 hrs, mins = divmod(mins_left, 60)
                 next_str  = f"{hrs}h {mins}m" if hrs else f"{mins}m"
@@ -121,8 +124,8 @@ last_run = get_last_successful_run()
 if last_run:
     finished_raw = last_run.get("finished_at") or ""
     try:
-        finished_dt  = datetime.fromisoformat(finished_raw)
-        finished_str = finished_dt.strftime("%-d %b %Y, %-I:%M %p UTC")
+        finished_dt  = datetime.fromisoformat(finished_raw).replace(tzinfo=timezone.utc).astimezone(PT)
+        finished_str = finished_dt.strftime("%-d %b %Y, %-I:%M %p PT")
     except (ValueError, TypeError):
         finished_str = finished_raw[:16].replace("T", " ") or "—"
 
@@ -154,7 +157,11 @@ if recent:
     for run in recent:
         status   = run.get("status", "unknown")
         icon     = STATUS_ICON.get(status, "❔")
-        started  = (run.get("started_at") or "")[:16].replace("T", " ")
+        _started_raw = run.get("started_at") or ""
+        try:
+            started = datetime.fromisoformat(_started_raw).replace(tzinfo=timezone.utc).astimezone(PT).strftime("%-d %b, %-I:%M %p PT")
+        except (ValueError, TypeError):
+            started = _started_raw[:16].replace("T", " ")
         duration = run.get("duration_secs")
 
         with st.container(border=True):
