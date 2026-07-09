@@ -259,18 +259,20 @@ def render_kanban_card(app: dict, col_key: str, tailored_ids: set) -> None:
 
             if email_result:
                 verified_email = email_result.get("email")
-                if verified_email:
+                estatus = email_result.get("status")
+                if verified_email and estatus == "verified":
                     st.caption(f"✅ Contact: {verified_email} ({email_result['source']})")
-                    # Offer to save to the contact field if not already there.
-                    if not (app.get("contact_email") or "").strip():
-                        if st.button("Save to contact", key=f"save_found_{key}"):
-                            update_application_field(app_id, "contact_email", verified_email)
-                            if email_result.get("name") and not (app.get("contact_name") or "").strip():
-                                update_application_field(app_id, "contact_name", email_result["name"])
-                            st.toast("Contact saved.")
-                            st.rerun()
-                else:
+                elif verified_email and estatus == "accept_all":
+                    st.caption(f"⚠️ {verified_email} — unconfirmed (domain accepts all mail, may or may not be a real mailbox)")
+                elif not verified_email:
                     st.caption(f"⚠️ {email_result['source']}")
+                if verified_email and not (app.get("contact_email") or "").strip():
+                    if st.button("Save to contact", key=f"save_found_{key}"):
+                        update_application_field(app_id, "contact_email", verified_email)
+                        if email_result.get("name") and not (app.get("contact_name") or "").strip():
+                            update_application_field(app_id, "contact_name", email_result["name"])
+                        st.toast("Contact saved.")
+                        st.rerun()
 
             if draft_body is not None:
                 edited = st.text_area(
