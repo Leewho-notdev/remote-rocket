@@ -86,10 +86,7 @@ SLUG_BLOCKLIST = {
     "checkr",           # background screening
     "kraken",           # crypto exchange
     "ibotta",           # retail tech
-    "openai",           # mostly engineering
-    "klaviyo",          # mostly engineering
-    "clickup",          # mostly engineering
-    "1password",        # cybersecurity
+    "openai",           # mostly engineering, very few marketing roles
 }
 
 
