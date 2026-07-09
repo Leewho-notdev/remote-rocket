@@ -41,6 +41,8 @@ def ensure_phase2_schema() -> None:
         mr_cols = {row[1] for row in conn.execute("PRAGMA table_info(master_resume)")}
         if "structured_json" not in mr_cols:
             conn.execute("ALTER TABLE master_resume ADD COLUMN structured_json TEXT")
+        if "master_docx" not in mr_cols:
+            conn.execute("ALTER TABLE master_resume ADD COLUMN master_docx BLOB")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS tailored_documents (
                 id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -81,20 +83,22 @@ def has_master_resume() -> bool:
 
 
 def save_master_resume(raw_text: str, structured_json: str | None = None,
-                       source_filename: str | None = None) -> None:
+                       source_filename: str | None = None,
+                       master_docx: bytes | None = None) -> None:
     """Upsert the single master resume row (id = 1)."""
     ensure_phase2_schema()
     conn = get_connection()
     try:
         conn.execute("""
-            INSERT INTO master_resume (id, raw_text, structured_json, source_filename)
-            VALUES (1, ?, ?, ?)
+            INSERT INTO master_resume (id, raw_text, structured_json, source_filename, master_docx)
+            VALUES (1, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 raw_text        = excluded.raw_text,
                 structured_json = excluded.structured_json,
                 source_filename = excluded.source_filename,
+                master_docx     = COALESCE(excluded.master_docx, master_resume.master_docx),
                 updated_at      = datetime('now')
-        """, (raw_text, structured_json, source_filename))
+        """, (raw_text, structured_json, source_filename, master_docx))
         conn.commit()
     finally:
         conn.close()

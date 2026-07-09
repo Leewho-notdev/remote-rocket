@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import streamlit as st
 
 from components.resume_store import get_master_resume, save_master_resume
-from components.resume_files import extract_text
+from components.resume_files import extract_text, markdown_to_docx
 from components.resume_generator import structure_resume, structured_to_markdown
 from components.theme import apply_theme
 
@@ -29,6 +29,7 @@ st.caption("Set this up once. Every job you tailor for uses it — no need to to
 
 master = get_master_resume()
 replace_mode = st.session_state.get("resume_replace_mode", False)
+edit_mode = st.session_state.get("resume_edit_mode", False)
 
 
 # ── Upload / replace flow ──────────────────────────────────────────────────────
@@ -64,7 +65,14 @@ def _render_uploader() -> None:
         with st.spinner("Reading and organizing your resume…"):
             structured = structure_resume(raw)  # None on failure — we still save raw
 
-        save_master_resume(raw, structured, filename)
+        docx_bytes = None
+        try:
+            md = structured_to_markdown(json.loads(structured)) if structured else raw
+            docx_bytes = markdown_to_docx(md)
+        except Exception:
+            pass
+
+        save_master_resume(raw, structured, filename, docx_bytes)
         st.session_state["resume_replace_mode"] = False
         if structured is None:
             st.warning("Saved. (Couldn't auto-organize the sections, so tailoring will use the raw text.)")
@@ -73,15 +81,68 @@ def _render_uploader() -> None:
         st.rerun()
 
 
+# ── Edit mode ─────────────────────────────────────────────────────────────────
+def _render_edit(m: dict) -> None:
+    st.subheader("Edit your resume")
+
+    edited = st.text_area(
+        "Resume text",
+        value=m.get("raw_text") or "",
+        height=600,
+        label_visibility="collapsed",
+    )
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("← Cancel", use_container_width=True):
+            st.session_state["resume_edit_mode"] = False
+            st.rerun()
+    with col2:
+        if st.button("✨ Save changes", type="primary", use_container_width=True):
+            with st.spinner("Re-organizing your resume…"):
+                structured = structure_resume(edited.strip())
+
+            # Build a fresh .docx from the updated content.
+            docx_bytes = None
+            try:
+                md = structured_to_markdown(json.loads(structured)) if structured else edited.strip()
+                docx_bytes = markdown_to_docx(md)
+            except Exception:
+                pass
+
+            save_master_resume(edited.strip(), structured, m.get("source_filename"), docx_bytes)
+            st.session_state["resume_edit_mode"] = False
+            st.rerun()
+
+
 # ── Read-only preview ──────────────────────────────────────────────────────────
 def _render_preview(m: dict) -> None:
     updated = (m.get("updated_at") or "")[:16].replace("T", " ")
     src = m.get("source_filename") or "pasted text"
     st.success(f"Master resume saved ✓  ·  from {src}  ·  updated {updated}")
 
-    if st.button("🔄 Replace / Re-upload", use_container_width=True):
-        st.session_state["resume_replace_mode"] = True
-        st.rerun()
+    docx_bytes = m.get("master_docx")
+    if docx_bytes:
+        col1, col2, col3 = st.columns(3)
+    else:
+        col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("✏️ Edit text", use_container_width=True):
+            st.session_state["resume_edit_mode"] = True
+            st.rerun()
+    with col2:
+        if st.button("🔄 Replace / Re-upload", use_container_width=True):
+            st.session_state["resume_replace_mode"] = True
+            st.rerun()
+    if docx_bytes:
+        with col3:
+            src = m.get("source_filename") or "resume.docx"
+            if not src.lower().endswith(".docx"):
+                src = src.rsplit(".", 1)[0] + ".docx"
+            st.download_button("⬇️ Download .docx", data=bytes(docx_bytes),
+                               file_name=src, mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                               use_container_width=True)
 
     st.divider()
 
@@ -107,7 +168,9 @@ def _render_preview(m: dict) -> None:
 
 
 # ── Route ──────────────────────────────────────────────────────────────────────
-if master and not replace_mode:
+if master and edit_mode:
+    _render_edit(master)
+elif master and not replace_mode:
     _render_preview(master)
 else:
     if master and replace_mode and st.button("← Cancel", use_container_width=True):
