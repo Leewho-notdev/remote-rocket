@@ -282,9 +282,25 @@ def render_kanban_card(app: dict, col_key: str, tailored_ids: set) -> None:
                     key=f"draft_text_{key}",
                     label_visibility="collapsed",
                 )
-                # st.code has a built-in copy icon in the top-right corner.
-                st.code(edited, language=None)
-
+                import html as _html
+                escaped = _html.escape(edited).replace("'", "&#39;").replace("\n", "\\n")
+                st.components.v1.html(
+                    f"""<button onclick="
+                        var t=document.createElement('textarea');
+                        t.value='{escaped}';
+                        document.body.appendChild(t);
+                        t.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(t);
+                        this.innerText='✅ Copied!';
+                        setTimeout(()=>this.innerText='📋 Copy email',1500);"
+                        style="width:100%;padding:6px;background:#1e1e1e;color:#aaa;
+                               border:1px solid #333;border-radius:4px;cursor:pointer;
+                               font-size:0.8rem;margin-top:2px;">
+                        📋 Copy email
+                    </button>""",
+                    height=38,
+                )
                 # mailto link.
                 to_addr = (email_result or {}).get("email") or ""
                 subject = followup_subject(app)
