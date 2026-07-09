@@ -98,6 +98,19 @@ if is_running:
         "**Expect 15–25 minutes for a full run.** Subsequent runs are faster — most jobs are "
         "already in the database and get skipped as duplicates early in the pipeline."
     )
+
+    # Live log tail — shown inline while running, auto-updates every 5s
+    LOG_PATH_LIVE = os.getenv("LOG_PATH", "/app/logs/scraper.log")
+    if os.path.exists(LOG_PATH_LIVE):
+        try:
+            with open(LOG_PATH_LIVE, "r") as _f:
+                _lines = _f.readlines()
+            _tail = "".join(_lines[-60:])
+            st.markdown("**Live log (last 60 lines):**")
+            st.code(_tail, language=None)
+        except Exception:
+            pass
+
     time.sleep(5)
     st.rerun()
 
