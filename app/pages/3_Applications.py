@@ -282,20 +282,8 @@ def render_kanban_card(app: dict, col_key: str, tailored_ids: set) -> None:
                     key=f"draft_text_{key}",
                     label_visibility="collapsed",
                 )
-                # Copy button via JS.
-                import html as _html
-                escaped = _html.escape(edited, quote=True).replace("\n", "\\n").replace("'", "\\'")
-                st.components.v1.html(
-                    f"""
-                    <button onclick="navigator.clipboard.writeText('{escaped}')"
-                        style="width:100%;padding:8px;background:#1e1e1e;color:#ccc;
-                               border:1px solid #444;border-radius:4px;cursor:pointer;
-                               font-size:0.85rem;">
-                        📋 Copy to clipboard
-                    </button>
-                    """,
-                    height=45,
-                )
+                # st.code has a built-in copy icon in the top-right corner.
+                st.code(edited, language=None)
 
                 # mailto link.
                 to_addr = (email_result or {}).get("email") or ""
