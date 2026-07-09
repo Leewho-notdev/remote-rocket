@@ -168,32 +168,27 @@ def render_kanban_card(app: dict, col_key: str, tailored_ids: set) -> None:
                 placeholder="Interview prep, impressions, recruiter name…",
                 label_visibility="collapsed",
             )
-            save_col, date_col = st.columns(2)
-            with save_col:
-                if st.button("Save notes", key=f"save_notes_{key}", use_container_width=True):
-                    update_application_field(app_id, "notes", notes_val)
-                    st.toast("Notes saved.")
+            if st.button("Save notes", key=f"save_notes_{key}", use_container_width=True):
+                update_application_field(app_id, "notes", notes_val)
+                st.toast("Notes saved.")
 
-            with date_col:
-                existing_date = app.get("follow_up_date")
-                default_date  = None
-                if existing_date:
-                    try:
-                        default_date = date.fromisoformat(existing_date[:10])
-                    except (ValueError, TypeError):
-                        pass
-                follow_up = st.date_input(
-                    "Follow-up date",
-                    value=default_date,
-                    key=f"followup_{key}",
-                    label_visibility="collapsed",
-                    format="YYYY-MM-DD",
-                )
-                if follow_up and str(follow_up) != (existing_date or "")[:10]:
-                    update_application_field(app_id, "follow_up_date", str(follow_up))
-                    st.toast("Follow-up date saved.")
+            existing_date = app.get("follow_up_date")
+            default_date  = None
+            if existing_date:
+                try:
+                    default_date = date.fromisoformat(existing_date[:10])
+                except (ValueError, TypeError):
+                    pass
+            follow_up = st.date_input(
+                "Follow-up date",
+                value=default_date,
+                key=f"followup_{key}",
+                format="YYYY-MM-DD",
+            )
+            if follow_up and str(follow_up) != (existing_date or "")[:10]:
+                update_application_field(app_id, "follow_up_date", str(follow_up))
+                st.toast("Follow-up date saved.")
 
-            # Contact info
             contact_name  = st.text_input(
                 "Recruiter / contact name",
                 value=app.get("contact_name") or "",
@@ -204,7 +199,7 @@ def render_kanban_card(app: dict, col_key: str, tailored_ids: set) -> None:
                 value=app.get("contact_email") or "",
                 key=f"contact_email_{key}",
             )
-            if st.button("Save contact", key=f"save_contact_{key}"):
+            if st.button("Save contact", key=f"save_contact_{key}", use_container_width=True):
                 update_application_field(app_id, "contact_name",  contact_name)
                 update_application_field(app_id, "contact_email", contact_email)
                 st.toast("Contact saved.")
