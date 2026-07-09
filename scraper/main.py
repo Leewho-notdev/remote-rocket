@@ -214,12 +214,14 @@ def _process_raw_job(
             job["exclusion_reason"] = reason
             stats["jobs_excluded"] += 1
 
-        # Salary pre-screen — only when salary_max is explicitly stated and below floor.
-        # Uses salary_max (not min) to avoid excluding roles with wide ranges like $60k-$120k.
+        # Salary pre-screen — only for full_time roles with an explicit salary_max below floor.
+        # Skips contract/part_time: hourly rates are already annualized but the floor
+        # doesn't apply the same way, and part-time salaries are intentionally lower.
         # Never excludes when salary is missing — too many good jobs omit salary data.
         if not excluded:
-            sal_max = job.get("salary_max")
-            if sal_max and sal_max < SALARY_PRESCREEN_FLOOR:
+            sal_max  = job.get("salary_max")
+            emp_type = job.get("employment_type", "full_time")
+            if sal_max and sal_max < SALARY_PRESCREEN_FLOOR and emp_type == "full_time":
                 reason   = f"Salary ceiling ${sal_max:,} is below minimum ${SALARY_PRESCREEN_FLOOR:,}"
                 excluded = True
                 job["is_excluded"]      = 1
