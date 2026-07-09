@@ -69,6 +69,29 @@ KEYWORD_CLAUSE = (
     'OR "performance marketing" OR "biddable media" OR "Google Ads"'
 )
 
+# ATS slugs to never pull from — job aggregators, gaming/crypto/retail companies
+# with huge non-marketing workforces that produce mostly irrelevant jobs.
+SLUG_BLOCKLIST = {
+    "jobgether",        # job aggregator, not a company
+    "weloglobal",       # 100% exclusion rate
+    "getwingapp",       # 100% exclusion rate
+    "distro",           # 100% exclusion rate
+    "harvey",           # 100% exclusion rate
+    "2k",               # gaming company
+    "nord-security",    # cybersecurity, not marketing
+    "assist-world",     # 99% exclusion rate
+    "keyloop",          # automotive tech
+    "hive",             # 100% exclusion rate
+    "brooksrunning",    # running shoes
+    "checkr",           # background screening
+    "kraken",           # crypto exchange
+    "ibotta",           # retail tech
+    "openai",           # mostly engineering
+    "klaviyo",          # mostly engineering
+    "clickup",          # mostly engineering
+    "1password",        # cybersecurity
+}
+
 
 BRAVE_API_KEY  = os.getenv("BRAVE_API_KEY", "")
 BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search"
@@ -158,7 +181,7 @@ def run_discovery(existing_slugs: dict | None = None) -> list[dict]:
             if m:
                 slug = m.group(1).lower().strip("/")
                 # Skip generic/noise slugs
-                if slug and slug not in ("jobs", "careers", "apply", "j", "o"):
+                if slug and slug not in ("jobs", "careers", "apply", "j", "o") and slug not in SLUG_BLOCKLIST:
                     slugs_this_query.add(slug)
 
         log.info(f"[DISCOVERY] {site} → {len(slugs_this_query)} unique board slugs extracted")
