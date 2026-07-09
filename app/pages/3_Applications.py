@@ -11,9 +11,14 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from datetime import date
+import json
 import streamlit as st
 from components.db import get_applications, upsert_application, update_application_field
-from components.resume_store import jobs_with_tailoring
+from components.resume_store import get_master_resume, jobs_with_tailoring
+from components.resume_generator import structured_to_markdown
+from components.followup_generator import (
+    find_verified_email, draft_followup_email, followup_subject,
+)
 from components.theme import apply_theme
 
 st.set_page_config(
@@ -203,6 +208,96 @@ def render_kanban_card(app: dict, col_key: str, tailored_ids: set) -> None:
                 update_application_field(app_id, "contact_name",  contact_name)
                 update_application_field(app_id, "contact_email", contact_email)
                 st.toast("Contact saved.")
+
+        # ── Follow-up email ───────────────────────────────────────────────────
+        FOLLOWUP_STAGES = {"applied", "phone_screen", "interview"}
+        if app.get("status") in FOLLOWUP_STAGES:
+            st.markdown("---")
+            draft_key  = f"followup_draft_{app_id}"
+            email_key  = f"followup_email_{app_id}"
+
+            if st.button("📧 Draft follow-up email", key=f"draft_btn_{key}",
+                         use_container_width=True):
+                with st.spinner("Finding contact email…"):
+                    saved_email = (app.get("contact_email") or "").strip()
+                    if saved_email:
+                        result = {"email": saved_email, "name": app.get("contact_name"),
+                                  "status": "verified", "source": "Saved contact"}
+                    else:
+                        result = find_verified_email(app, app.get("contact_name") or "")
+
+                st.session_state[email_key] = result
+
+                # Gather sender name from master resume.
+                sender_name = ""
+                resume_summary = ""
+                master = get_master_resume()
+                if master and master.get("structured_json"):
+                    try:
+                        sj = json.loads(master["structured_json"])
+                        sender_name    = sj.get("name") or ""
+                        resume_summary = sj.get("summary") or ""
+                    except Exception:
+                        pass
+
+                with st.spinner("Drafting email…"):
+                    try:
+                        body = draft_followup_email(
+                            job            = app,
+                            sender_name    = sender_name,
+                            contact_name   = app.get("contact_name") or "",
+                            applied_date   = (app.get("applied_date") or "")[:10],
+                            resume_summary = resume_summary,
+                        )
+                        st.session_state[draft_key] = body
+                    except Exception as e:
+                        st.error(str(e))
+
+            # Show results if a draft exists in session state.
+            email_result = st.session_state.get(email_key)
+            draft_body   = st.session_state.get(draft_key)
+
+            if email_result:
+                verified_email = email_result.get("email")
+                if verified_email:
+                    st.caption(f"✅ Contact: {verified_email} ({email_result['source']})")
+                    # Offer to save to the contact field if not already there.
+                    if not (app.get("contact_email") or "").strip():
+                        if st.button("Save to contact", key=f"save_found_{key}"):
+                            update_application_field(app_id, "contact_email", verified_email)
+                            if email_result.get("name") and not (app.get("contact_name") or "").strip():
+                                update_application_field(app_id, "contact_name", email_result["name"])
+                            st.toast("Contact saved.")
+                            st.rerun()
+                else:
+                    st.caption(f"⚠️ {email_result['source']}")
+
+            if draft_body is not None:
+                edited = st.text_area(
+                    "Follow-up email",
+                    value=draft_body,
+                    height=220,
+                    key=f"draft_text_{key}",
+                    label_visibility="collapsed",
+                )
+                # Copy-friendly code block.
+                with st.expander("Copy to clipboard"):
+                    st.code(edited, language=None)
+
+                # mailto link.
+                to_addr = (email_result or {}).get("email") or ""
+                subject = followup_subject(app)
+                import urllib.parse
+                mailto_href = (
+                    f"mailto:{urllib.parse.quote(to_addr)}"
+                    f"?subject={urllib.parse.quote(subject)}"
+                )
+                st.markdown(
+                    f'<a href="{mailto_href}" target="_blank" '
+                    f'style="display:block;text-align:center;padding:8px 0;'
+                    f'font-size:0.85rem;color:#ff6b35;">📨 Open in email client</a>',
+                    unsafe_allow_html=True,
+                )
 
 
 # ── Active pipeline Kanban ────────────────────────────────────────────────────
