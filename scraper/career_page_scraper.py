@@ -221,30 +221,44 @@ def fetch_lever(company: dict, slug: str) -> list[dict]:
 
 
 def fetch_workable(company: dict, slug: str) -> list[dict]:
-    url  = f"https://apply.workable.com/api/v1/widget/listings/{slug}"
+    # Workable deprecated /api/v1/widget/listings/{slug}; the replacement is the
+    # public jobs.md table exposed at /{slug}/jobs.md (no auth required).
+    url = f"https://apply.workable.com/{slug}/jobs.md"
     log.info(f"  [Workable] {company['name']} → {url}")
     resp = _get(url)
     resp.raise_for_status()
-    raw_jobs = resp.json().get("results", [])
-    log.info(f"  [Workable] {company['name']} — {len(raw_jobs)} listings")
+    text = resp.text
+
     jobs = []
-    for raw in raw_jobs:
-        title    = (raw.get("title") or "").strip()
-        shortcode = raw.get("shortcode") or raw.get("id") or ""
-        job_url  = raw.get("url") or f"https://apply.workable.com/{slug}/j/{shortcode}/"
-        if not title or not shortcode:
+    # Parse the markdown table: | Title | Department | Location | Type | Salary | Posted | Details |
+    # Rows look like: | Some Title | Dept | Location | Full-time | USD ... | 2026-01-01 | [View](url) |
+    for line in text.splitlines():
+        line = line.strip()
+        if not line.startswith("|") or line.startswith("| Title") or line.startswith("|---"):
             continue
-        loc     = raw.get("location") or {}
-        is_remote = raw.get("remote", False)
-        location = "Remote" if is_remote else ", ".join(filter(None, [loc.get("city"), loc.get("country")]))
+        cols = [c.strip() for c in line.strip("|").split("|")]
+        if len(cols) < 7:
+            continue
+        title    = cols[0]
+        location = cols[2]
+        # Extract job URL from [View](url)
+        m = re.search(r'\[View\]\(([^)]+)\)', cols[6])
+        if not title or not m:
+            continue
+        job_url = m.group(1)
+        # Derive a stable external_id from the shortcode in the URL
+        shortcode_m = re.search(r'/view/([^./]+)', job_url)
+        shortcode = shortcode_m.group(1) if shortcode_m else title.lower().replace(" ", "-")
         jobs.append(_build_job_dict(
             company     = company,
             title       = title,
             location    = location or "Remote",
-            url         = job_url,
+            url         = job_url.replace(".md", ""),
             external_id = f"workable_{slug}_{shortcode}",
-            description = _strip_html(raw.get("description") or ""),
+            description = "",
         ))
+
+    log.info(f"  [Workable] {company['name']} — {len(jobs)} listings")
     return jobs
 
 

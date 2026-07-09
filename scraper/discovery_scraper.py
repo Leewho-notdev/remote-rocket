@@ -1,21 +1,22 @@
 """
 scraper/discovery_scraper.py
-Discovers "hidden gem" job boards by searching Google for ATS URLs
-matching paid search / PPC keywords. Extracts company slugs from the
-results and pulls all jobs from each board via the ATS API.
+Discovers "hidden gem" job boards by searching for ATS URLs matching
+paid search / PPC keywords. Extracts company slugs from results and
+pulls all jobs from each board via the ATS API.
 
 This surfaces jobs from companies that never post on LinkedIn or Indeed
 and that we'd never think to add to companies.yml manually.
 
-Google scraping strategy:
+Search strategy:
 - 4 site: queries per run (one per ATS platform), keywords combined into one query
-- 15-second sleep between queries to stay under Google's radar
-- Zero-result monitoring: if Google blocks us, every query returns 0 and we log loudly
+- Uses Brave Search API (BRAVE_API_KEY) — real REST API, no scraping, free tier
+- 2-second sleep between queries (polite, not required)
+- Zero-result monitoring: if queries fail, we log loudly
 - Falls back gracefully — discovery failures never crash the main scrape
 
 Health monitoring signals (visible in the Settings → Scraper Log tab):
 - [DISCOVERY] lines show per-query result counts
-- WARNING fired if >50% of queries return 0 results (likely CAPTCHA / blocked)
+- WARNING fired if >50% of queries return 0 results
 - Summary line at end: boards found, boards already known, jobs fetched
 """
 
@@ -29,14 +30,14 @@ import requests
 
 log = logging.getLogger("remote-rocket.discovery")
 
-# Seconds to sleep between Google queries. Too fast = CAPTCHA.
-GOOGLE_QUERY_DELAY = 15
+# Seconds to sleep between search queries.
+QUERY_DELAY = 2
 
 # Seconds to sleep between ATS API calls after discovery.
 ATS_CALL_DELAY = 2
 
-# How many Google results to request per query.
-GOOGLE_RESULTS_PER_QUERY = 20
+# How many search results to request per query.
+SEARCH_RESULTS_PER_QUERY = 20
 
 # ATS platforms to search, with URL patterns for slug extraction.
 ATS_TARGETS = [
@@ -69,44 +70,37 @@ KEYWORD_CLAUSE = (
 )
 
 
-SCRAPINGBEE_API_KEY = os.getenv("SCRAPINGBEE_API_KEY", "")
-SCRAPINGBEE_URL     = "https://app.scrapingbee.com/api/v1/"
+BRAVE_API_KEY  = os.getenv("BRAVE_API_KEY", "")
+BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search"
 
 
-def _google_search(query: str, num_results: int = 20) -> list[str]:
+def _search(query: str, num_results: int = 20) -> list[str]:
     """
-    Search Google via ScrapingBee (if key set) or googlesearch-python fallback.
-    Returns a list of result URLs.
+    Search via Brave Search API. Returns a list of result URLs.
+    Brave API returns up to 20 results per call on the free plan.
     """
-    if SCRAPINGBEE_API_KEY:
-        # ScrapingBee scrapes a URL — pass the Google search URL directly.
-        # We get back raw HTML and extract hrefs ourselves (extract_rules
-        # requires a paid plan feature; this works on all plans).
-        google_url = (
-            "https://www.google.com/search?q="
-            + requests.utils.quote(query)
-            + f"&num={num_results}&hl=en&gl=us"
-        )
-        resp = requests.get(
-            SCRAPINGBEE_URL,
-            params={
-                "api_key":   SCRAPINGBEE_API_KEY,
-                "url":       google_url,
-                "render_js": "false",
-            },
-            timeout=60,
-        )
-        resp.raise_for_status()
-        # Parse all hrefs from the HTML and keep external result links
-        all_hrefs = re.findall(r'href=["\']([^"\']+)["\']', resp.text)
-        return [u for u in all_hrefs if u.startswith("http") and "google.com" not in u]
-    else:
-        try:
-            from googlesearch import search as google_search
-            return list(google_search(query, num_results=num_results, sleep_interval=2))
-        except ImportError:
-            log.error("[DISCOVERY] No search backend available. Set SCRAPINGBEE_API_KEY or install googlesearch-python.")
-            return []
+    if not BRAVE_API_KEY:
+        log.error("[DISCOVERY] BRAVE_API_KEY not set — cannot run discovery.")
+        return []
+    resp = requests.get(
+        BRAVE_SEARCH_URL,
+        headers={
+            "Accept":               "application/json",
+            "Accept-Encoding":      "gzip",
+            "X-Subscription-Token": BRAVE_API_KEY,
+        },
+        params={
+            "q":      query,
+            "count":  min(num_results, 20),
+            "search_lang": "en",
+            "country":     "us",
+        },
+        timeout=30,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    results = data.get("web", {}).get("results", [])
+    return [r["url"] for r in results if r.get("url")]
 
 
 def run_discovery(existing_slugs: dict | None = None) -> list[dict]:
@@ -123,10 +117,10 @@ def run_discovery(existing_slugs: dict | None = None) -> list[dict]:
     if existing_slugs is None:
         existing_slugs = {}
 
-    if SCRAPINGBEE_API_KEY:
-        log.info("[DISCOVERY] Using ScrapingBee for Google searches")
-    else:
-        log.warning("[DISCOVERY] SCRAPINGBEE_API_KEY not set — using googlesearch-python (may be blocked by VPS IP)")
+    if not BRAVE_API_KEY:
+        log.error("[DISCOVERY] BRAVE_API_KEY not set — skipping discovery.")
+        return []
+    log.info("[DISCOVERY] Using Brave Search API")
 
     all_jobs      = []
     total_queries = 0
@@ -143,9 +137,9 @@ def run_discovery(existing_slugs: dict | None = None) -> list[dict]:
         total_queries += 1
 
         try:
-            results = _google_search(query, num_results=GOOGLE_RESULTS_PER_QUERY)
+            results = _search(query, num_results=SEARCH_RESULTS_PER_QUERY)
         except Exception as e:
-            log.warning(f"[DISCOVERY] Google search failed for {site}: {e}")
+            log.warning(f"[DISCOVERY] Search failed for {site}: {e}")
             results = []
 
         if not results:
@@ -191,18 +185,15 @@ def run_discovery(existing_slugs: dict | None = None) -> list[dict]:
             except Exception as e:
                 log.warning(f"[DISCOVERY]   → Failed to fetch {ats}/{slug}: {e}")
 
-        # Polite delay between Google queries (skip after last one)
+        # Polite delay between queries
         if target != ATS_TARGETS[-1]:
-            delay = GOOGLE_QUERY_DELAY + random.uniform(0, 5)
-            log.info(f"[DISCOVERY] Waiting {delay:.0f}s before next Google query …")
-            time.sleep(delay)
+            time.sleep(QUERY_DELAY)
 
     # ── Health check ──────────────────────────────────────────────────────────
     if total_queries > 0 and zero_results / total_queries > 0.5:
-        backend = "ScrapingBee" if SCRAPINGBEE_API_KEY else "googlesearch-python"
         log.warning(
             f"[DISCOVERY] ⚠️  HEALTH WARNING: {zero_results}/{total_queries} queries returned "
-            f"0 results via {backend}. Google is likely rate-limiting or CAPTCHAing requests."
+            f"0 results. Check BRAVE_API_KEY and account credits at api.search.brave.com."
         )
     else:
         log.info(
