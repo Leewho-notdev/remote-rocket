@@ -17,8 +17,8 @@ import streamlit as st
 
 # ── Palette ───────────────────────────────────────────────────────────────────
 BG        = "#0D0D0D"   # app background (brand black)
-SURFACE   = "#161616"   # cards, sidebar, inputs
-SURFACE_2 = "#1F1F1F"   # hover / elevated
+SURFACE   = "#242424"   # cards, sidebar, inputs
+SURFACE_2 = "#2E2E2E"   # hover / elevated
 BORDER    = "#2A2A2A"
 ORANGE    = "#FF5E1A"   # brand accent
 ORANGE_HI = "#FF7A45"   # hover
