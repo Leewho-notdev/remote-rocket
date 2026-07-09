@@ -132,7 +132,7 @@ last_run = get_last_successful_run()
 if last_run:
     finished_raw = last_run.get("finished_at") or ""
     try:
-        finished_dt  = datetime.fromisoformat(finished_raw).replace(tzinfo=timezone.utc).astimezone(PT)
+        finished_dt  = datetime.fromisoformat(finished_raw.replace(" ", "T")).replace(tzinfo=timezone.utc).astimezone(PT)
         finished_str = finished_dt.strftime("%-d %b %Y, %-I:%M %p PT")
     except (ValueError, TypeError):
         finished_str = finished_raw[:16].replace("T", " ") or "—"
@@ -167,7 +167,7 @@ if recent:
         icon     = STATUS_ICON.get(status, "❔")
         _started_raw = run.get("started_at") or ""
         try:
-            started = datetime.fromisoformat(_started_raw).replace(tzinfo=timezone.utc).astimezone(PT).strftime("%-d %b, %-I:%M %p PT")
+            started = datetime.fromisoformat(_started_raw.replace(" ", "T")).replace(tzinfo=timezone.utc).astimezone(PT).strftime("%-d %b, %-I:%M %p PT")
         except (ValueError, TypeError):
             started = _started_raw[:16].replace("T", " ")
         duration = run.get("duration_secs")
