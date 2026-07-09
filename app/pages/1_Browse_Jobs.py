@@ -37,9 +37,6 @@ if not db_exists():
 # ── Page header ───────────────────────────────────────────────────────────────
 st.title("📋 Browse Jobs")
 
-counts = get_job_counts()
-total_active = counts.get("active", 0)
-
 # Shared filter kwargs (everything except source)
 base_filters = dict(
     min_salary        = filters["min_salary"],
@@ -59,35 +56,32 @@ base_filters = dict(
 )
 
 selected_sources = filters["sources"] or ["jobspy", "career_page"]
+gems       = get_jobs(sources=["career_page"], limit=200, **base_filters) if "career_page" in selected_sources else []
+board_jobs = get_jobs(sources=["jobspy"],       limit=200, **base_filters) if "jobspy"       in selected_sources else []
+total_showing = len(gems) + len(board_jobs)
+
+st.caption(f"Showing **{total_showing}** jobs")
+st.divider()
 
 # ── Hidden Gems section ───────────────────────────────────────────────────────
 if "career_page" in selected_sources:
-    gems = get_jobs(sources=["career_page"], limit=200, **base_filters)
-
     st.markdown("## 💎 Hidden Gems")
     st.caption(
         "Jobs sourced directly from company career pages — "
         "not posted on LinkedIn or Indeed. These are the unique finds."
     )
-
     if gems:
-        st.caption(f"Showing **{len(gems)}** career page jobs")
         for i, job in enumerate(gems):
             render_job_card(job, index=i)
     else:
         st.info("No career page jobs match your current filters.", icon="💎")
-
     st.divider()
 
 # ── Job boards section ────────────────────────────────────────────────────────
 if "jobspy" in selected_sources:
-    board_jobs = get_jobs(sources=["jobspy"], limit=200, **base_filters)
-
     st.markdown("## 📌 Job Boards")
     st.caption("Jobs from LinkedIn, Indeed, and other job boards.")
-
     if board_jobs:
-        st.caption(f"Showing **{len(board_jobs)}** job board listings")
         for i, job in enumerate(board_jobs):
             render_job_card(job, index=i)
     else:
@@ -95,7 +89,4 @@ if "jobspy" in selected_sources:
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.divider()
-st.caption(
-    f"{total_active} total active jobs in database. "
-    "Adjust filters or go to **Settings** to trigger a new scrape."
-)
+st.caption("Adjust filters or go to **Settings** to trigger a new scrape.")
