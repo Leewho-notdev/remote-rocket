@@ -66,10 +66,18 @@ def _extract_domain(job: dict) -> str | None:
         if match:
             host = match.group(1).lower()
             # Skip job board domains — they aren't the company.
-            boards = {"linkedin.com", "indeed.com", "glassdoor.com", "ziprecruiter.com",
-                      "lever.co", "greenhouse.io", "workday.com", "icims.com",
-                      "myworkdayjobs.com", "taleo.net", "smartrecruiters.com",
-                      "jobvite.com", "adzuna.com", "monster.com", "careerbuilder.com"}
+            boards = {
+                # Job boards
+                "linkedin.com", "indeed.com", "glassdoor.com", "ziprecruiter.com",
+                "monster.com", "careerbuilder.com", "adzuna.com", "simplyhired.com",
+                "dice.com", "builtin.com",
+                # ATS platforms
+                "lever.co", "greenhouse.io", "ashbyhq.com", "workday.com",
+                "myworkdayjobs.com", "icims.com", "taleo.net", "smartrecruiters.com",
+                "jobvite.com", "breezy.hr", "recruitee.com", "bamboohr.com",
+                "jazz.co", "applytojob.com", "workable.com", "pinpointhq.com",
+                "rippling.com", "gusto.com", "hire.withgoogle.com",
+            }
             if not any(host.endswith(b) for b in boards):
                 return host
 
