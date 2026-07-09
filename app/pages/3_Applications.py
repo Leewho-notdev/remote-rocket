@@ -277,8 +277,6 @@ def render_kanban_card(app: dict, col_key: str, tailored_ids: set,
                 estatus = email_result.get("status")
                 if verified_email and estatus == "verified":
                     st.caption(f"✅ Contact: {verified_email} ({email_result['source']})")
-                elif verified_email and estatus == "accept_all":
-                    st.caption(f"⚠️ {verified_email} — unconfirmed (domain accepts all mail, may or may not be a real mailbox)")
                 elif not verified_email:
                     st.caption(f"⚠️ {email_result['source']}")
                 if verified_email and not (app.get("contact_email") or "").strip():

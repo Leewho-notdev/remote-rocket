@@ -181,20 +181,13 @@ def find_verified_email(job: dict, contact_name: str = "") -> dict:
             "status": "verified",
             "source": f"Verified via Hunter.io ({domain})",
         }
-    elif vstatus == "accept_all":
-        return {
-            "email":  email_addr,
-            "name":   email_name,
-            "status": "accept_all",
-            "source": f"Found via Hunter.io ({domain}) — domain accepts all mail, address unconfirmed",
-        }
     else:
         log.info(f"Hunter verification status for {email_addr}: {vstatus} — not surfacing.")
         return {
             "email":  None,
             "name":   email_name,
             "status": "unverifiable",
-            "source": f"Found {email_addr} but verification status was '{vstatus}' — not surfacing to avoid bounces.",
+            "source": f"No verified email found for {domain} (Hunter status: {vstatus}).",
         }
 
 
