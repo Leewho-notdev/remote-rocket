@@ -24,7 +24,7 @@ from components.theme import apply_theme
 st.set_page_config(
     page_title="Applications — Remote Rocket",
     page_icon="🚀",
-    layout="wide",
+    layout="centered",
 )
 apply_theme()
 st.title("📁 Applications Pipeline")
@@ -258,12 +258,8 @@ def render_kanban_card(app: dict, col_key: str, tailored_ids: set,
                             previous_followups = history,
                         )
                         st.session_state[draft_key] = body
-                        save_followup(
-                            job_id        = job_id,
-                            followup_num  = len(history) + 1,
-                            draft_text    = body,
-                            contact_email = (result or {}).get("email") or "",
-                        )
+                        # Store history length so we know what number this is.
+                        st.session_state[f"followup_histlen_{app_id}"] = len(history)
                         st.rerun()
                     except Exception as e:
                         st.error(str(e))
@@ -332,34 +328,46 @@ def render_kanban_card(app: dict, col_key: str, tailored_ids: set,
                     f'font-size:0.85rem;color:#ff6b35;">📨 Open in email client</a>',
                     unsafe_allow_html=True,
                 )
+                histlen = st.session_state.get(f"followup_histlen_{app_id}", fu_count)
+                if st.button("✅ Mark as sent", key=f"mark_sent_{key}",
+                             use_container_width=True):
+                    save_followup(
+                        job_id        = job_id,
+                        followup_num  = histlen + 1,
+                        draft_text    = draft_body,
+                        contact_email = (email_result or {}).get("email") or "",
+                    )
+                    del st.session_state[draft_key]
+                    if email_key in st.session_state:
+                        del st.session_state[email_key]
+                    st.toast("Follow-up logged.")
+                    st.rerun()
 
 
-# ── Active pipeline Kanban ────────────────────────────────────────────────────
-kanban_cols = st.columns(len(ACTIVE_PIPELINE))
+# ── Tabs layout ───────────────────────────────────────────────────────────────
+tab_labels = [f"{label} ({len(grouped[k])})" for k, label in ACTIVE_PIPELINE]
+closed_total = sum(len(grouped[k]) for k, _ in CLOSED_PIPELINE)
+if closed_total > 0:
+    tab_labels.append(f"Closed ({closed_total})")
 
-for col_widget, (status_key, label) in zip(kanban_cols, ACTIVE_PIPELINE):
-    with col_widget:
-        apps_in_col = grouped[status_key]
-        st.markdown(f"**{label}** ({len(apps_in_col)})")
-        st.divider()
-        if apps_in_col:
-            for app in apps_in_col:
+tabs = st.tabs(tab_labels)
+
+for tab, (status_key, label) in zip(tabs[:len(ACTIVE_PIPELINE)], ACTIVE_PIPELINE):
+    with tab:
+        apps_in_tab = grouped[status_key]
+        if apps_in_tab:
+            for app in apps_in_tab:
                 render_kanban_card(app, col_key=status_key, tailored_ids=tailored_ids,
                                    followup_counts=followup_counts)
         else:
-            st.caption("Empty")
+            st.caption("Nothing here yet.")
 
-
-# ── Closed applications ───────────────────────────────────────────────────────
-closed_total = sum(len(grouped[k]) for k, _ in CLOSED_PIPELINE)
 if closed_total > 0:
-    with st.expander(f"Closed applications — {closed_total} total (rejected / withdrawn)"):
-        closed_cols = st.columns(len(CLOSED_PIPELINE))
-        for col_widget, (status_key, label) in zip(closed_cols, CLOSED_PIPELINE):
-            with col_widget:
-                apps_in_col = grouped[status_key]
-                st.markdown(f"**{label}** ({len(apps_in_col)})")
-                st.divider()
-                for app in apps_in_col:
+    with tabs[-1]:
+        for status_key, label in CLOSED_PIPELINE:
+            apps_in_group = grouped[status_key]
+            if apps_in_group:
+                st.markdown(f"**{label}**")
+                for app in apps_in_group:
                     render_kanban_card(app, col_key=status_key, tailored_ids=tailored_ids,
                                        followup_counts=followup_counts)
