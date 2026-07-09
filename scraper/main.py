@@ -54,6 +54,10 @@ logging.basicConfig(
 )
 log = logging.getLogger("remote-rocket.main")
 
+# Pre-screen salary floor — only applied when JobSpy returns a salary_max
+# and it's clearly below this threshold. Never excludes jobs with no salary data.
+SALARY_PRESCREEN_FLOOR = int(os.getenv("SALARY_MIN_DEFAULT", 70_000))
+
 
 # ── Main entry point ──────────────────────────────────────────────────────────
 
@@ -210,6 +214,19 @@ def _process_raw_job(
             job["exclusion_reason"] = reason
             stats["jobs_excluded"] += 1
 
+        # Salary pre-screen — only when salary_max is explicitly stated and below floor.
+        # Uses salary_max (not min) to avoid excluding roles with wide ranges like $60k-$120k.
+        # Never excludes when salary is missing — too many good jobs omit salary data.
+        if not excluded:
+            sal_max = job.get("salary_max")
+            if sal_max and sal_max < SALARY_PRESCREEN_FLOOR:
+                reason   = f"Salary ceiling ${sal_max:,} is below minimum ${SALARY_PRESCREEN_FLOOR:,}"
+                excluded = True
+                job["is_excluded"]      = 1
+                job["exclusion_reason"] = reason
+                stats["jobs_excluded"] += 1
+                log.debug(f"Pre-excluded (salary): '{job.get('title')}' — {reason}")
+
         # Deduplication — updates last_seen_at on URL hits
         is_dup = check_and_handle_duplicate(conn, job)
         if is_dup:
@@ -252,6 +269,11 @@ def _run_extraction(conn, job_id: int, job_dict: dict, stats: dict) -> None:
 
         # Only update if we got a relevance score back (extraction succeeded)
         if enriched.get("relevance_score") is not None:
+            # Auto-exclude anything scoring 5 or below — not worth showing
+            if not enriched.get("is_excluded") and enriched["relevance_score"] <= 5:
+                enriched["is_excluded"]      = True
+                enriched["exclusion_reason"] = f"Low relevance score ({enriched['relevance_score']}/10)"
+
             update_job_llm_fields(conn, job_id, enriched)
             stats["jobs_scored"] += 1
 
