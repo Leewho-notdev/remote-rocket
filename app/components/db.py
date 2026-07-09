@@ -89,9 +89,9 @@ def get_jobs(
         conditions.append("j.date_posted >= date('now', ?)")
         params.append(f"-{days_posted} days")
 
-    # Relevance score
+    # Relevance score — allow NULLs through so unscored jobs still appear
     if min_score > 0:
-        conditions.append("j.relevance_score >= ?")
+        conditions.append("(j.relevance_score IS NULL OR j.relevance_score >= ?)")
         params.append(min_score)
 
     # Keyword search in title + company
