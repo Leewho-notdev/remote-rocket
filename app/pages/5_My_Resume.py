@@ -116,8 +116,23 @@ def _render_edit(m: dict) -> None:
 
 
 # ── Read-only preview ──────────────────────────────────────────────────────────
+def _utc_to_pacific(ts: str) -> str:
+    from datetime import datetime, timezone, timedelta
+    try:
+        dt = datetime.fromisoformat(ts.replace(" ", "T")).replace(tzinfo=timezone.utc)
+        # Pacific: UTC-8 (PST) or UTC-7 (PDT). Use zoneinfo if available, else hardcode PDT.
+        try:
+            from zoneinfo import ZoneInfo
+            dt = dt.astimezone(ZoneInfo("America/Los_Angeles"))
+        except Exception:
+            dt = dt.astimezone(timezone(timedelta(hours=-7)))  # PDT fallback
+        return dt.strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return (ts or "")[:16].replace("T", " ")
+
+
 def _render_preview(m: dict) -> None:
-    updated = (m.get("updated_at") or "")[:16].replace("T", " ")
+    updated = _utc_to_pacific(m.get("updated_at") or "")
     src = m.get("source_filename") or "pasted text"
     st.success(f"Master resume saved ✓  ·  from {src}  ·  updated {updated}")
 
