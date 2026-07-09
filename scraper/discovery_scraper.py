@@ -82,11 +82,16 @@ SLUG_BLOCKLIST = {
     "assist-world",     # 99% exclusion rate
     "keyloop",          # automotive tech
     "hive",             # 100% exclusion rate
-    "brooksrunning",    # running shoes
     "checkr",           # background screening
     "kraken",           # crypto exchange
     "ibotta",           # retail tech
     "openai",           # mostly engineering, very few marketing roles
+    "brooksrunning",    # 57 jobs, 0 keepers
+    "checkr",           # 55 jobs, 0 keepers
+    "hive",             # 58 jobs, 0 keepers
+    "ibotta",           # 37 jobs, 0 keepers
+    "keyloop",          # 63 jobs, 0 keepers
+    "kraken",           # 45 jobs, 0 keepers
 }
 
 
