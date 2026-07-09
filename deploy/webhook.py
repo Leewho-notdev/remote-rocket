@@ -31,7 +31,7 @@ def verify_signature(body: bytes, sig_header: str) -> bool:
 def deploy():
     log.info("Starting deploy")
     result = subprocess.run(
-        ["bash", "-c", "git pull && docker compose restart app"],
+        ["bash", "-c", "git stash && git pull && docker compose restart app"],
         cwd=REPO_DIR,
         capture_output=True,
         text=True,
