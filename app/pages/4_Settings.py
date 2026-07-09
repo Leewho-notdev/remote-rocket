@@ -87,7 +87,15 @@ st.divider()
 
 # ── Running state banner + auto-refresh ──────────────────────────────────────
 recent_check = get_recent_scrape_runs(limit=1)
-is_running = recent_check and recent_check[0].get("status") == "running"
+is_running = bool(recent_check and recent_check[0].get("status") == "running")
+
+# Detect transition from running → done and rerun once to show completion state
+was_running = st.session_state.get("scrape_was_running", False)
+st.session_state["scrape_was_running"] = is_running
+if was_running and not is_running:
+    st.success("✅ Scrape complete! Results updated.", icon="🎉")
+    time.sleep(1)
+    st.rerun()
 
 if is_running:
     st.warning("⏳ Scrape in progress — page refreshes every 5 seconds.", icon="🔄")
