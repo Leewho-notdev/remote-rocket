@@ -210,6 +210,13 @@ def render_kanban_card(app: dict, col_key: str, tailored_ids: set,
         # ── Follow-up email ───────────────────────────────────────────────────
         FOLLOWUP_STAGES = {"applied", "phone_screen", "interview"}
         if app.get("status") in FOLLOWUP_STAGES:
+            st.markdown(
+                '<div style="border-left:3px solid #FF5E1A;padding-left:10px;'
+                'margin-top:8px;background:#1a1000;padding:8px 8px 2px 10px;">'
+                '<span style="font-size:0.75rem;font-weight:700;letter-spacing:0.08em;'
+                'text-transform:uppercase;color:#FF5E1A;">Follow-up</span></div>',
+                unsafe_allow_html=True,
+            )
             with st.container(border=True):
                 draft_key  = f"followup_draft_{app_id}"
                 email_key  = f"followup_email_{app_id}"
