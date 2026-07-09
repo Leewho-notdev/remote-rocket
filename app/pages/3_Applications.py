@@ -289,16 +289,17 @@ def render_kanban_card(app: dict, col_key: str, tailored_ids: set,
                 edited = st.components.v1.html(
                     f"""
                     <style>
-                      body {{margin:0;background:#0e1117;}}
+                      body {{margin:0;background:#1a1200;padding:10px;
+                             border-left:3px solid #ff6b35;border-radius:4px;}}
                       textarea {{
                         width:100%;box-sizing:border-box;height:200px;
-                        background:#1e1e1e;color:#fafafa;border:1px solid #444;
+                        background:#241900;color:#fafafa;border:1px solid #5a3a00;
                         border-radius:4px;padding:10px;font-size:0.85rem;
                         font-family:sans-serif;resize:vertical;
                       }}
                       button {{
                         margin-top:6px;width:100%;padding:7px;
-                        background:#1e1e1e;color:#aaa;border:1px solid #333;
+                        background:#2e2000;color:#ffb347;border:1px solid #5a3a00;
                         border-radius:4px;cursor:pointer;font-size:0.8rem;
                       }}
                     </style>
