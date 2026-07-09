@@ -86,7 +86,7 @@ def get_jobs(
 
     # Date posted
     if days_posted:
-        conditions.append("j.date_posted >= date('now', ?)")
+        conditions.append("(j.date_posted IS NULL OR j.date_posted >= date('now', ?))")
         params.append(f"-{days_posted} days")
 
     # Relevance score — allow NULLs through so unscored jobs still appear
