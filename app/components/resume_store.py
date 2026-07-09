@@ -58,8 +58,72 @@ def ensure_phase2_schema() -> None:
             "CREATE INDEX IF NOT EXISTS idx_tailored_job "
             "ON tailored_documents(job_id, version)"
         )
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS followup_emails (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_id        INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+                followup_num  INTEGER NOT NULL,
+                draft_text    TEXT,
+                contact_email TEXT,
+                sent_at       TEXT,
+                created_at    TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_followup_job "
+            "ON followup_emails(job_id)"
+        )
         conn.commit()
         _schema_ready = True
+    finally:
+        conn.close()
+
+
+# ── Follow-up email history ────────────────────────────────────────────────────
+
+def save_followup(job_id: int, followup_num: int, draft_text: str,
+                  contact_email: str = "") -> int:
+    ensure_phase2_schema()
+    conn = get_connection()
+    try:
+        cur = conn.execute("""
+            INSERT INTO followup_emails (job_id, followup_num, draft_text, contact_email)
+            VALUES (?, ?, ?, ?)
+        """, (job_id, followup_num, draft_text, contact_email))
+        conn.commit()
+        return cur.lastrowid
+    finally:
+        conn.close()
+
+
+def get_followups(job_id: int) -> list:
+    ensure_phase2_schema()
+    conn = get_connection()
+    try:
+        rows = conn.execute("""
+            SELECT id, followup_num, draft_text, contact_email, sent_at, created_at
+            FROM followup_emails
+            WHERE job_id = ?
+            ORDER BY followup_num ASC
+        """, (job_id,)).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def followup_count_by_job(job_ids: list) -> dict:
+    """Return {job_id: count} for a list of job ids."""
+    if not job_ids:
+        return {}
+    ensure_phase2_schema()
+    conn = get_connection()
+    try:
+        placeholders = ",".join("?" * len(job_ids))
+        rows = conn.execute(
+            f"SELECT job_id, COUNT(*) FROM followup_emails WHERE job_id IN ({placeholders}) GROUP BY job_id",
+            job_ids,
+        ).fetchall()
+        return {r[0]: r[1] for r in rows}
     finally:
         conn.close()
 

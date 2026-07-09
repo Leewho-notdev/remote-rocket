@@ -201,13 +201,25 @@ def find_verified_email(job: dict, contact_name: str = "") -> dict:
 # ── Email drafting ─────────────────────────────────────────────────────────────
 
 def draft_followup_email(job: dict, sender_name: str, contact_name: str = "",
-                         applied_date: str = "", resume_summary: str = "") -> str:
+                         applied_date: str = "", resume_summary: str = "",
+                         previous_followups: list = None) -> str:
     """
     Draft a follow-up email using Claude.
 
-    Returns the email body as a plain string (no subject line — keep it
-    separate so the mailto link can carry it).
+    `previous_followups` is a list of dicts from get_followups() — passed so
+    Claude can write a conscious progression rather than repeating itself.
+    Returns the email body as a plain string (no subject line).
     """
+    followup_num = len(previous_followups or []) + 1
+
+    history_block = ""
+    if previous_followups:
+        lines = []
+        for f in previous_followups:
+            date_str = (f.get("created_at") or "")[:10]
+            lines.append(f"Follow-up #{f['followup_num']} (sent {date_str}):\n{f['draft_text']}")
+        history_block = "\n\n---\n".join(lines)
+
     prompts = _load_prompts()
     system  = prompts.get("followup_system", "")
     prompt  = prompts.get("followup_draft", "").format(
@@ -217,6 +229,8 @@ def draft_followup_email(job: dict, sender_name: str, contact_name: str = "",
         contact_name   = contact_name or "Hiring Team",
         applied_date   = applied_date or "recently",
         resume_summary = resume_summary or "",
+        followup_num   = followup_num,
+        history_block  = history_block or "None — this is the first follow-up.",
     )
 
     try:

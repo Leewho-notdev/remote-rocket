@@ -14,7 +14,7 @@ from datetime import date
 import json
 import streamlit as st
 from components.db import get_applications, upsert_application, update_application_field
-from components.resume_store import get_master_resume, jobs_with_tailoring
+from components.resume_store import get_master_resume, jobs_with_tailoring, get_followups, save_followup, followup_count_by_job
 from components.resume_generator import structured_to_markdown
 from components.followup_generator import (
     find_verified_email, draft_followup_email, followup_subject,
@@ -75,7 +75,9 @@ if total == 0:
     )
     st.stop()
 
-tailored_ids = jobs_with_tailoring()
+tailored_ids  = jobs_with_tailoring()
+all_job_ids   = [a["job_id"] for a in get_applications()]
+followup_counts = followup_count_by_job(all_job_ids)
 
 metric_cols = st.columns(len(ALL_STATUSES))
 for col, (status_key, label) in zip(metric_cols, ALL_STATUSES):
@@ -107,7 +109,8 @@ def _score_badge(score) -> str:
     return f"🔴 {score}"
 
 
-def render_kanban_card(app: dict, col_key: str, tailored_ids: set) -> None:
+def render_kanban_card(app: dict, col_key: str, tailored_ids: set,
+                       followup_counts: dict = None) -> None:
     """
     Render one application card.  col_key is used to build unique widget keys.
     `tailored_ids` is the set of job_ids that already have a tailored version.
@@ -211,8 +214,15 @@ def render_kanban_card(app: dict, col_key: str, tailored_ids: set) -> None:
             draft_key  = f"followup_draft_{app_id}"
             email_key  = f"followup_email_{app_id}"
 
-            if st.button("📧 Draft follow-up email", key=f"draft_btn_{key}",
-                         use_container_width=True):
+            fu_count   = (followup_counts or {}).get(job_id, 0)
+            btn_label  = (
+                f"📧 Draft follow-up #{fu_count + 1}"
+                if fu_count > 0 else "📧 Draft follow-up email"
+            )
+            if fu_count > 0:
+                st.caption(f"📬 {fu_count} follow-up{'s' if fu_count != 1 else ''} sent")
+
+            if st.button(btn_label, key=f"draft_btn_{key}", use_container_width=True):
                 with st.spinner("Finding contact email…"):
                     saved_email = (app.get("contact_email") or "").strip()
                     if saved_email:
@@ -223,7 +233,7 @@ def render_kanban_card(app: dict, col_key: str, tailored_ids: set) -> None:
 
                 st.session_state[email_key] = result
 
-                # Gather sender name from master resume.
+                # Gather sender name + summary from master resume.
                 sender_name = ""
                 resume_summary = ""
                 master = get_master_resume()
@@ -235,16 +245,26 @@ def render_kanban_card(app: dict, col_key: str, tailored_ids: set) -> None:
                     except Exception:
                         pass
 
+                history = get_followups(job_id)
+
                 with st.spinner("Drafting email…"):
                     try:
                         body = draft_followup_email(
-                            job            = app,
-                            sender_name    = sender_name,
-                            contact_name   = app.get("contact_name") or "",
-                            applied_date   = (app.get("applied_date") or "")[:10],
-                            resume_summary = resume_summary,
+                            job                = app,
+                            sender_name        = sender_name,
+                            contact_name       = app.get("contact_name") or "",
+                            applied_date       = (app.get("applied_date") or "")[:10],
+                            resume_summary     = resume_summary,
+                            previous_followups = history,
                         )
                         st.session_state[draft_key] = body
+                        save_followup(
+                            job_id        = job_id,
+                            followup_num  = len(history) + 1,
+                            draft_text    = body,
+                            contact_email = (result or {}).get("email") or "",
+                        )
+                        st.rerun()
                     except Exception as e:
                         st.error(str(e))
 
@@ -326,7 +346,8 @@ for col_widget, (status_key, label) in zip(kanban_cols, ACTIVE_PIPELINE):
         st.divider()
         if apps_in_col:
             for app in apps_in_col:
-                render_kanban_card(app, col_key=status_key, tailored_ids=tailored_ids)
+                render_kanban_card(app, col_key=status_key, tailored_ids=tailored_ids,
+                                   followup_counts=followup_counts)
         else:
             st.caption("Empty")
 
@@ -342,4 +363,5 @@ if closed_total > 0:
                 st.markdown(f"**{label}** ({len(apps_in_col)})")
                 st.divider()
                 for app in apps_in_col:
-                    render_kanban_card(app, col_key=status_key, tailored_ids=tailored_ids)
+                    render_kanban_card(app, col_key=status_key, tailored_ids=tailored_ids,
+                                       followup_counts=followup_counts)

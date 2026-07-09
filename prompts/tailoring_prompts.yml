@@ -155,23 +155,33 @@ followup_system: |
     into the opening sentence naturally, or address by name if one is provided.
 
 followup_draft: |
-  Write a follow-up email for this job application.
+  Write follow-up #{followup_num} for this job application.
 
   Candidate name: {sender_name}
   Contact / recipient: {contact_name}
   Job title: {job_title}
   Company: {job_company}
   Applied: {applied_date}
-  Resume summary (for context only — do not recite it): {resume_summary}
+  Resume summary (for context only, do not recite it): {resume_summary}
 
-  Guidelines:
-  - Open by referencing the specific role and when they applied. One sentence.
-  - Middle paragraph: one concrete, relevant reason they are a strong fit for
-    THIS role. Ground it in something real from the resume summary if provided.
-    If not, keep it brief and genuine rather than generic.
-  - Close with a simple ask: happy to answer questions, looking forward to
-    next steps. Nothing groveling.
-  - Sign off with just the candidate's first name.
-  - Total length: 80 to 120 words. Short is better than long.
+  Previous follow-ups sent (read these carefully before writing):
+  {history_block}
 
+  Tone progression rules — match the number exactly:
+  - #1: Warm, direct check-in. Reference the role and application date.
+    One concrete reason you are a strong fit. Close with an open ask.
+  - #2: Brief. Acknowledge you reached out before. Do not repeat the same
+    pitch. Show you are still genuinely interested but respect their time.
+    Shorter than #1.
+  - #3: Very short. Acknowledge the silence without bitterness. Keep the
+    door open. One paragraph. No pitch, no pressure.
+  - #4 and beyond: Even shorter. Graceful, final-sounding. Make clear you
+    will not follow up again but leave a strong last impression. Wish them
+    well. Under 50 words.
+
+  Do not repeat phrases, sentences, or angles from the previous follow-ups
+  listed above. Each email must feel like a different moment in a real
+  human conversation.
+
+  Sign off with just the candidate's first name.
   Write the email body only. No subject line. No markdown formatting.
