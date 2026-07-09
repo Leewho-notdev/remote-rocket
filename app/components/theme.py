@@ -203,9 +203,13 @@ div[role="alert"] {{
 }}
 
 /* ── Job card containers (st.container(border=True)) ─────────────────── */
-[data-testid="stVerticalBlockBorderWrapper"],
+[data-testid="stVerticalBlockBorderWrapper"] {{
+    border-radius: 0 !important;
+    background: {SURFACE} !important;
+}}
 [data-testid="stVerticalBlockBorderWrapper"] > div {{
     border-radius: 0 !important;
+    background: {SURFACE} !important;
 }}
 
 /* ── Expander — target all nested elements ────────────────────────────── */
