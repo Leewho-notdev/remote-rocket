@@ -248,11 +248,8 @@ div[role="alert"] {{
 /* Trim Streamlit's default top padding; add breathing room on all screen sizes */
 .stApp [data-testid="stMainBlockContainer"] {{
     padding-top: 3rem;
-    padding-left: 1.5rem !important;
-    padding-right: 1.5rem !important;
-    box-sizing: border-box !important;
-    width: 100% !important;
-    max-width: 100% !important;
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
 }}
 
 </style>
