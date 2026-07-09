@@ -275,31 +275,35 @@ def render_kanban_card(app: dict, col_key: str, tailored_ids: set) -> None:
                         st.rerun()
 
             if draft_body is not None:
-                edited = st.text_area(
-                    "Follow-up email",
-                    value=draft_body,
-                    height=220,
-                    key=f"draft_text_{key}",
-                    label_visibility="collapsed",
-                )
                 import html as _html
-                escaped = _html.escape(edited).replace("'", "&#39;").replace("\n", "\\n")
-                st.components.v1.html(
-                    f"""<button onclick="
-                        var t=document.createElement('textarea');
-                        t.value='{escaped}';
-                        document.body.appendChild(t);
-                        t.select();
-                        document.execCommand('copy');
-                        document.body.removeChild(t);
-                        this.innerText='✅ Copied!';
-                        setTimeout(()=>this.innerText='📋 Copy email',1500);"
-                        style="width:100%;padding:6px;background:#1e1e1e;color:#aaa;
-                               border:1px solid #333;border-radius:4px;cursor:pointer;
-                               font-size:0.8rem;margin-top:2px;">
-                        📋 Copy email
-                    </button>""",
-                    height=38,
+                safe = _html.escape(draft_body)
+                edited = st.components.v1.html(
+                    f"""
+                    <style>
+                      body {{margin:0;background:#0e1117;}}
+                      textarea {{
+                        width:100%;box-sizing:border-box;height:200px;
+                        background:#1e1e1e;color:#fafafa;border:1px solid #444;
+                        border-radius:4px;padding:10px;font-size:0.85rem;
+                        font-family:sans-serif;resize:vertical;
+                      }}
+                      button {{
+                        margin-top:6px;width:100%;padding:7px;
+                        background:#1e1e1e;color:#aaa;border:1px solid #333;
+                        border-radius:4px;cursor:pointer;font-size:0.8rem;
+                      }}
+                    </style>
+                    <textarea id="em">{safe}</textarea>
+                    <button onclick="
+                      var t=document.getElementById('em');
+                      t.select();
+                      document.execCommand('copy');
+                      this.innerText='✅ Copied!';
+                      setTimeout(()=>this.innerText='📋 Copy email',1500);">
+                      📋 Copy email
+                    </button>
+                    """,
+                    height=270,
                 )
                 # mailto link.
                 to_addr = (email_result or {}).get("email") or ""
