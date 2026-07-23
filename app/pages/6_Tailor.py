@@ -131,6 +131,7 @@ if st.button(gen_label, type="primary", use_container_width=True):
     v = add_tailored_version(
         job_id, result["tailored_resume"], result["cover_letter"], notes=notes
     )
+    st.session_state[f"changelog_{job_id}"] = result.get("change_log", "")
     st.success(f"Done — version {v} ready below.")
     st.rerun()
 
@@ -148,7 +149,7 @@ st.caption(
     + (f" · note: “{latest['notes']}”" if latest.get("notes") else "")
 )
 
-tab_resume, tab_cover = st.tabs(["📄 Resume", "✉️ Cover Letter"])
+tab_resume, tab_cover, tab_log = st.tabs(["📄 Resume", "✉️ Cover Letter", "📝 Change Log"])
 
 with tab_resume:
     resume_text = st.text_area(
@@ -189,6 +190,13 @@ with tab_cover:
         st.code(cover_text, language="markdown")
     with st.expander("👁 Preview"):
         st.markdown(cover_text)
+
+with tab_log:
+    changelog = st.session_state.get(f"changelog_{job_id}", "")
+    if changelog:
+        st.markdown(changelog)
+    else:
+        st.info("Generate or regenerate to see a change log explaining the customizations made for this role.")
 
 # Save inline edits back onto this version (doesn't create a new version).
 if st.button("💾 Save my edits", use_container_width=True):

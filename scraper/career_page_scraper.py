@@ -524,9 +524,11 @@ def _build_job_dict(company: dict, title: str, location: str, url: str,
     }
 
 
-def _strip_html(html: str) -> str:
-    if not html:
+def _strip_html(raw: str) -> str:
+    if not raw:
         return ""
-    text = re.sub(r"<[^>]+>", " ", html)
+    import html as _html
+    raw = _html.unescape(raw)
+    text = re.sub(r"<[^>]+>", " ", raw)
     text = re.sub(r"\s+", " ", text).strip()
     return text[:MAX_CONTENT_CHARS]

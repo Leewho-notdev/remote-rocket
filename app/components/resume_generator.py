@@ -39,6 +39,7 @@ MAX_RESUME_CHARS = 14000
 
 RESUME_MARK = "===TAILORED_RESUME==="
 COVER_MARK = "===COVER_LETTER==="
+CHANGELOG_MARK = "===CHANGE_LOG==="
 
 _client = None
 
@@ -170,9 +171,13 @@ def structured_to_markdown(structured: dict) -> str:
 
 def resume_text_for_tailoring(master: dict) -> str:
     """
-    Best resume text to feed the tailoring step: prefer the clean structured
-    render, fall back to raw text if structuring wasn't available.
+    Best resume text to feed the tailoring step: prefer raw_text so Claude sees
+    the actual section names and layout to mirror. Fall back to the structured
+    render only if raw text is empty.
     """
+    raw = (master.get("raw_text") or "").strip()
+    if raw:
+        return raw
     sj = master.get("structured_json")
     if sj:
         try:
@@ -181,7 +186,39 @@ def resume_text_for_tailoring(master: dict) -> str:
                 return md
         except (json.JSONDecodeError, TypeError):
             pass
-    return master.get("raw_text") or ""
+    return ""
+
+
+_AGE_PHRASE_RE = re.compile(
+    r"""
+    (?:over|more\s+than|nearly|almost|approximately\s+)?  # optional quantifier
+    \b\d{1,2}\+?\s*years?\b                               # "15+ years" / "15 years"
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+_SEASONED_RE = re.compile(
+    r'\b(seasoned|veteran)\b(?:\s+professional)?\s*',
+    re.IGNORECASE,
+)
+
+_DECADES_RE = re.compile(
+    r'\bdecades?\s+of\s+(?:experience|expertise)\b',
+    re.IGNORECASE,
+)
+
+
+def _strip_age_phrases(text: str) -> str:
+    """Remove career-length phrases before sending resume to Claude.
+
+    Strips "15+ years", "over 20 years", "seasoned professional", etc. so the
+    model never sees them and cannot copy them into the tailored output.
+    """
+    text = _AGE_PHRASE_RE.sub('', text)
+    text = _SEASONED_RE.sub('', text)
+    text = _DECADES_RE.sub('', text)
+    text = re.sub(r'[ \t]{2,}', ' ', text)
+    return text
 
 
 def _parse_json(raw_text: str) -> dict | None:
@@ -207,7 +244,7 @@ def generate_tailored(job: dict, resume_text: str, notes: str = "") -> dict:
     `resume_text` is the master resume text. `notes` optionally steers the tone
     / emphasis for a regeneration.
 
-    Returns {"tailored_resume": str, "cover_letter": str}.
+    Returns {"tailored_resume": str, "cover_letter": str, "change_log": str}.
     Raises RuntimeError with a user-friendly message on failure.
     """
     description = (
@@ -226,14 +263,17 @@ def generate_tailored(job: dict, resume_text: str, notes: str = "") -> dict:
     if notes.strip():
         notes_block = prompts["notes_template"].format(notes=notes.strip())
 
+    clean_resume = _strip_age_phrases(resume_text)
+
     user_prompt = prompts["tailor"].format(
         notes_block=notes_block,
         resume_mark=RESUME_MARK,
         cover_mark=COVER_MARK,
+        changelog_mark=CHANGELOG_MARK,
         job_title=job.get("title", "") or "(untitled)",
         job_company=job.get("company", "") or "(unknown company)",
         job_description=description[:MAX_JOB_CHARS],
-        resume_text=resume_text[:MAX_RESUME_CHARS],
+        resume_text=clean_resume[:MAX_RESUME_CHARS],
     )
 
     try:
@@ -262,25 +302,38 @@ def generate_tailored(job: dict, resume_text: str, notes: str = "") -> dict:
 
 
 def _parse_sections(raw: str) -> dict:
-    """Split the model output on the resume/cover-letter delimiters."""
+    """Split the model output on the resume/cover-letter/changelog delimiters."""
     text = raw.strip()
     resume_text = ""
     cover_text = ""
+    changelog_text = ""
 
     if RESUME_MARK in text:
-        after = text.split(RESUME_MARK, 1)[1]
-        if COVER_MARK in after:
-            resume_part, cover_part = after.split(COVER_MARK, 1)
+        after_resume = text.split(RESUME_MARK, 1)[1]
+        if COVER_MARK in after_resume:
+            resume_part, after_cover = after_resume.split(COVER_MARK, 1)
             resume_text = resume_part.strip()
-            cover_text = cover_part.strip()
+            if CHANGELOG_MARK in after_cover:
+                cover_part, changelog_part = after_cover.split(CHANGELOG_MARK, 1)
+                cover_text = cover_part.strip()
+                changelog_text = changelog_part.strip()
+            else:
+                cover_text = after_cover.strip()
         else:
-            resume_text = after.strip()
+            resume_text = after_resume.strip()
     elif COVER_MARK in text:
-        cover_text = text.split(COVER_MARK, 1)[1].strip()
+        after_cover = text.split(COVER_MARK, 1)[1]
+        if CHANGELOG_MARK in after_cover:
+            cover_part, changelog_part = after_cover.split(CHANGELOG_MARK, 1)
+            cover_text = cover_part.strip()
+            changelog_text = changelog_part.strip()
+        else:
+            cover_text = after_cover.strip()
 
     return {
         "tailored_resume": _strip_fences(resume_text),
         "cover_letter": _strip_fences(cover_text),
+        "change_log": _strip_fences(changelog_text),
     }
 
 

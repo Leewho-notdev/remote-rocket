@@ -155,7 +155,7 @@ def render_filters() -> dict:
         "Company (A–Z)":    "company",
         "Date scraped":     "date_scraped",
     }
-    sort_label = st.sidebar.selectbox("Order results by", options=list(sort_map.keys()))
+    sort_label = st.sidebar.selectbox("Order results by", options=list(sort_map.keys()), index=1)
     sort_by    = sort_map[sort_label]
 
     # ── Advanced toggles ──────────────────────────────────────────────────────

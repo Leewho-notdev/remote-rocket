@@ -32,6 +32,10 @@ def _format_description(text: str) -> str:
     Preserves existing newlines and injects paragraph breaks before
     common section headers that run together in scraped text.
     """
+    # Decode HTML entities — covers existing DB records stored with &lt;div&gt; markup
+    text = html.unescape(text)
+    # Strip any HTML tags that became visible after unescaping
+    text = re.sub(r"<[^>]+>", " ", text)
     # Strip escape sequences and markdown bold/italic
     text = re.sub(r"\\([^\w\s])", r"\1", text)
     text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)

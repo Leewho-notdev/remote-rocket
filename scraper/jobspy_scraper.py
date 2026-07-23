@@ -248,8 +248,11 @@ def _is_us_or_unknown_location(location: str) -> bool:
 def _clean_text(text: str) -> str:
     """Strip HTML tags and collapse whitespace for cleaner display."""
     import re
+    import html as _html
     if not text:
         return ""
+    # Decode entities first — some sources return &lt;div&gt; style markup
+    text = _html.unescape(text)
     # Remove HTML tags
     text = re.sub(r"<[^>]+>", " ", text)
     # Collapse whitespace
