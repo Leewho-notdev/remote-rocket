@@ -127,9 +127,10 @@ def _normalize_jobspy_record(raw: dict, search_term: str) -> dict | None:
         salary_min = int(salary_min * 12)
         salary_max = int(salary_max * 12) if salary_max else None
 
-    # Employment type: normalize to our schema values
+    # Employment type: normalize to our schema values, falling back to
+    # title/description inference when JobSpy doesn't return a type
     job_type = _str(raw.get("job_type") or raw.get("employment_type", "")).lower()
-    employment_type = _map_employment_type(job_type)
+    employment_type = _infer_employment_type(job_type, title, description)
 
     # Date posted: JobSpy may return a date object or string
     date_posted = _str(raw.get("date_posted") or raw.get("posted_date") or "")
@@ -185,6 +186,13 @@ def _normalize_jobspy_record(raw: dict, search_term: str) -> dict | None:
     }
 
 
+_CONTRACT_SIGNALS = {
+    "contract", "contractor", "freelance", "consultant", "consulting",
+    "1099", "temporary", "temp", "c2c", "corp to corp", "corp-to-corp",
+    "contract-to-hire", "contract to hire", "c2h", "w2 contract",
+}
+
+
 def _map_employment_type(raw_type: str) -> str:
     """Map JobSpy's employment type strings to our schema values."""
     if not raw_type:
@@ -206,6 +214,17 @@ def _map_employment_type(raw_type: str) -> str:
         "internship":        "part_time",
     }
     return mapping.get(raw_type, "full_time")
+
+
+def _infer_employment_type(raw_type: str, title: str, description: str) -> str:
+    """Return employment type, inferring from title/description when JobSpy omits it."""
+    mapped = _map_employment_type(raw_type)
+    if raw_type or mapped != "full_time":
+        return mapped
+    combined = (title + " " + description[:500]).lower()
+    if any(signal in combined for signal in _CONTRACT_SIGNALS):
+        return "contract"
+    return "full_time"
 
 
 # Country names/patterns that clearly indicate a non-US job.
