@@ -245,11 +245,15 @@ div[role="alert"] {{
 .stApp a {{ color: {ORANGE}; }}
 .stApp a:hover {{ color: {ORANGE_HI}; }}
 
-/* Trim Streamlit's default top padding; add breathing room on all screen sizes */
-.stApp [data-testid="stMainBlockContainer"] {{
-    padding-top: 3rem;
-    padding-left: 2rem !important;
-    padding-right: 2rem !important;
+/* Main content padding — target every container Streamlit uses across versions */
+[data-testid="stMainBlockContainer"],
+[data-testid="block-container"],
+.main .block-container,
+[data-testid="stMain"] > div:first-child {{
+    padding-top: 2.5rem !important;
+    padding-left: 2.5rem !important;
+    padding-right: 2.5rem !important;
+    max-width: 100% !important;
 }}
 
 </style>
