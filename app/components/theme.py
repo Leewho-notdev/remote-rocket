@@ -248,8 +248,8 @@ div[role="alert"] {{
 /* Main content padding and overflow control */
 .stApp [data-testid="stMainBlockContainer"] {{
     padding-top: 2rem !important;
-    padding-left: 3rem !important;
-    padding-right: 3rem !important;
+    padding-left: 4rem !important;
+    padding-right: 4rem !important;
     max-width: 100% !important;
     overflow-x: hidden !important;
     box-sizing: border-box !important;

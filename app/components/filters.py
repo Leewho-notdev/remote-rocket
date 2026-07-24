@@ -41,10 +41,10 @@ def render_filters() -> dict:
 
     # ── Employment type ───────────────────────────────────────────────────────
     st.sidebar.subheader("Employment Type")
-    col_ft, col_ct, col_pt = st.sidebar.columns(3)
+    col_ft, col_ct = st.sidebar.columns(2)
     show_fulltime = col_ft.toggle("Full-time", value=True)
     show_contract = col_ct.toggle("Contract",  value=True)
-    show_parttime = col_pt.toggle("Part-time", value=False)
+    show_parttime = st.sidebar.toggle("Part-time", value=False)
     employment_types = (
         (["full_time"] if show_fulltime else [])
         + (["contract"] if show_contract else [])
