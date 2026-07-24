@@ -245,18 +245,29 @@ div[role="alert"] {{
 .stApp a {{ color: {ORANGE}; }}
 .stApp a:hover {{ color: {ORANGE_HI}; }}
 
-/* Main content padding — .stApp prefix confirmed working via DOM inspection */
+/* Main content padding and overflow control */
 .stApp [data-testid="stMainBlockContainer"] {{
     padding-top: 2rem !important;
     padding-left: 3rem !important;
     padding-right: 3rem !important;
     max-width: 100% !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
 }}
 @media (max-width: 768px) {{
     .stApp [data-testid="stMainBlockContainer"] {{
         padding-left: 1.25rem !important;
         padding-right: 1.25rem !important;
     }}
+}}
+
+/* Prevent flex columns from overflowing on narrow screens */
+[data-testid="stHorizontalBlock"] {{
+    min-width: 0 !important;
+}}
+[data-testid="stColumn"] {{
+    min-width: 0 !important;
+    overflow: hidden !important;
 }}
 
 </style>
