@@ -245,15 +245,18 @@ div[role="alert"] {{
 .stApp a {{ color: {ORANGE}; }}
 .stApp a:hover {{ color: {ORANGE_HI}; }}
 
-/* Main content padding — target every container Streamlit uses across versions */
-[data-testid="stMainBlockContainer"],
-[data-testid="block-container"],
-.main .block-container,
-[data-testid="stMain"] > div:first-child {{
-    padding-top: 2.5rem !important;
-    padding-left: 2.5rem !important;
-    padding-right: 2.5rem !important;
+/* Main content padding — .stApp prefix confirmed working via DOM inspection */
+.stApp [data-testid="stMainBlockContainer"] {{
+    padding-top: 2rem !important;
+    padding-left: 3rem !important;
+    padding-right: 3rem !important;
     max-width: 100% !important;
+}}
+@media (max-width: 768px) {{
+    .stApp [data-testid="stMainBlockContainer"] {{
+        padding-left: 1.25rem !important;
+        padding-right: 1.25rem !important;
+    }}
 }}
 
 </style>
