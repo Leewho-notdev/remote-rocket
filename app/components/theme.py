@@ -256,16 +256,17 @@ div[role="alert"] {{
 }}
 @media (max-width: 768px) {{
     .stApp [data-testid="stMainBlockContainer"] {{
-        padding-left: 1.25rem !important;
-        padding-right: 1.25rem !important;
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
     }}
 }}
 
-/* Prevent flex columns from overflowing on narrow screens */
-[data-testid="stHorizontalBlock"] {{
+/* Prevent main content flex columns from overflowing on narrow screens.
+   Scoped to stMainBlockContainer to avoid breaking sidebar columns. */
+.stApp [data-testid="stMainBlockContainer"] [data-testid="stHorizontalBlock"] {{
     min-width: 0 !important;
 }}
-[data-testid="stColumn"] {{
+.stApp [data-testid="stMainBlockContainer"] [data-testid="stColumn"] {{
     min-width: 0 !important;
     overflow: hidden !important;
 }}
