@@ -149,13 +149,13 @@ def render_filters() -> dict:
     # ── Sort ──────────────────────────────────────────────────────────────────
     st.sidebar.subheader("Sort By")
     sort_map = {
-        "Relevance score":  "relevance_score",
-        "Date posted":      "date_posted",
+        "Newest first":      "date_scraped",
+        "Relevance score":   "relevance_score",
+        "Date posted":       "date_posted",
         "Salary (high→low)": "salary_min",
-        "Company (A–Z)":    "company",
-        "Date scraped":     "date_scraped",
+        "Company (A–Z)":     "company",
     }
-    sort_label = st.sidebar.selectbox("Order results by", options=list(sort_map.keys()), index=1)
+    sort_label = st.sidebar.selectbox("Order results by", options=list(sort_map.keys()), index=0)
     sort_by    = sort_map[sort_label]
 
     # ── Advanced toggles ──────────────────────────────────────────────────────
